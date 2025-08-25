@@ -2,6 +2,9 @@ import { type User, type InsertUser, type Setting, type InsertSetting, type Chat
 import { randomUUID } from "crypto";
 import { neon } from "@neondatabase/serverless";
 import { drizzle } from "drizzle-orm/neon-http";
+import { drizzle as pgDrizzle } from "drizzle-orm/node-postgres";
+import pkg from "pg";
+const { Pool } = pkg;
 import { eq, desc } from "drizzle-orm";
 
 // modify the interface with any CRUD methods
@@ -202,8 +205,21 @@ export class DatabaseStorage implements IStorage {
     if (!databaseUrl) {
       throw new Error('Database URL is required for DatabaseStorage');
     }
-    const sql = neon(databaseUrl);
-    this.db = drizzle(sql);
+    
+    // Use standard PostgreSQL client for Railway
+    if (process.env.NODE_ENV === 'production') {
+      console.log('Using standard PostgreSQL client for Railway');
+      const pool = new Pool({
+        connectionString: databaseUrl,
+        ssl: databaseUrl.includes('railway') ? { rejectUnauthorized: false } : false
+      });
+      this.db = pgDrizzle(pool);
+    } else {
+      // Use Neon for development (Replit)
+      console.log('Using Neon client for development');
+      const sql = neon(databaseUrl);
+      this.db = drizzle(sql);
+    }
   }
 
   async getUser(id: string): Promise<User | undefined> {

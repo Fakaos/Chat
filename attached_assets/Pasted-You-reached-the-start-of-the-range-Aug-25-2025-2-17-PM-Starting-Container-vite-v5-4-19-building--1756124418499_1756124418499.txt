@@ -1,0 +1,60 @@
+You reached the start of the range → Aug 25, 2025, 2:17 PM
+Starting Container
+vite v5.4.19 building for production...
+transforming...
+Browserslist: browsers data (caniuse-lite) is 10 months old. Please run:
+  npx update-browserslist-db@latest
+  Why you should do it regularly: https://github.com/browserslist/update-db#readme
+✓ 1706 modules transformed.
+rendering chunks...
+computing gzip size...
+../dist/public/index.html                   2.20 kB │ gzip:   0.86 kB
+../dist/public/assets/index-Cu0d7xJS.css   61.25 kB │ gzip:  10.82 kB
+../dist/public/assets/index-D5hAI8cR.js   320.94 kB │ gzip: 102.42 kB
+✓ built in 5.78s
+npm warn config production Use `--omit=dev` instead.
+ 
+  dist/prod.js  19.4kb
+ 
+⚡ Done in 113ms
+Using PostgreSQL database storage
+Using PostgreSQL session store
+Server running on port 8080
+Registration error: NeonDbError: Error connecting to database: fetch failed
+    at execute (file:///app/node_modules/@neondatabase/serverless/index.mjs:1549:24)
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async NeonHttpPreparedQuery.execute (file:///app/node_modules/drizzle-orm/neon-http/session.js:40:20)
+    at async DatabaseStorage.getUserByUsername (file:///app/dist/prod.js:200:20)
+    at async file:///app/dist/prod.js:381:26 {
+  severity: undefined,
+  code: undefined,
+  detail: undefined,
+  hint: undefined,
+  position: undefined,
+  internalPosition: undefined,
+  internalQuery: undefined,
+  where: undefined,
+  schema: undefined,
+  table: undefined,
+  column: undefined,
+  dataType: undefined,
+  constraint: undefined,
+  file: undefined,
+  line: undefined,
+  routine: undefined,
+  sourceError: TypeError: fetch failed
+      at node:internal/deps/undici/undici:12618:11
+      at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+      at async execute (file:///app/node_modules/@neondatabase/serverless/index.mjs:1548:15)
+      at async NeonHttpPreparedQuery.execute (file:///app/node_modules/drizzle-orm/neon-http/session.js:40:20)
+      at async DatabaseStorage.getUserByUsername (file:///app/dist/prod.js:200:20)
+      at async file:///app/dist/prod.js:381:26 {
+    cause: Error: getaddrinfo ENOTFOUND api.railway.internal
+        at GetAddrInfoReqWrap.onlookup [as oncomplete] (node:dns:107:26) {
+      errno: -3008,
+      code: 'ENOTFOUND',
+      syscall: 'getaddrinfo',
+      hostname: 'api.railway.internal'
+    }
+  }
+}
