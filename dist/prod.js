@@ -185,8 +185,11 @@ var DatabaseStorage = class {
   db;
   logs = [];
   // Keep logs in memory for now
-  constructor() {
-    const sql2 = neon(process.env.DATABASE_URL);
+  constructor(databaseUrl) {
+    if (!databaseUrl) {
+      throw new Error("Database URL is required for DatabaseStorage");
+    }
+    const sql2 = neon(databaseUrl);
     this.db = drizzle(sql2);
   }
   async getUser(id) {
@@ -268,13 +271,18 @@ var DatabaseStorage = class {
     await this.upsertSetting("ngrok_url", url);
   }
 };
-var storage = new DatabaseStorage();
+var storage = process.env.DATABASE_URL ? new DatabaseStorage(process.env.DATABASE_URL) : new MemStorage();
 
 // server/prod.ts
 var appStorage;
 if (process.env.DATABASE_URL) {
-  appStorage = storage;
-  console.log("Using PostgreSQL database storage");
+  try {
+    appStorage = new DatabaseStorage(process.env.DATABASE_URL);
+    console.log("Using PostgreSQL database storage");
+  } catch (error) {
+    console.warn("Failed to initialize database storage, falling back to memory storage:", error);
+    appStorage = new MemStorage();
+  }
 } else {
   appStorage = new MemStorage();
   console.log("DATABASE_URL not found, using in-memory storage");

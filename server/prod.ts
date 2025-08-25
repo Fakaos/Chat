@@ -4,13 +4,18 @@ import connectPgSimple from "connect-pg-simple";
 import { neon } from "@neondatabase/serverless";
 import path from "path";
 import { fileURLToPath } from 'url';
-import { storage, MemStorage, IStorage } from "./storage";
+import { storage, MemStorage, DatabaseStorage, IStorage } from "./storage";
 
 // Use fallback storage if database is not available
 let appStorage: IStorage;
 if (process.env.DATABASE_URL) {
-  appStorage = storage; // DatabaseStorage
-  console.log('Using PostgreSQL database storage');
+  try {
+    appStorage = new DatabaseStorage(process.env.DATABASE_URL);
+    console.log('Using PostgreSQL database storage');
+  } catch (error) {
+    console.warn('Failed to initialize database storage, falling back to memory storage:', error);
+    appStorage = new MemStorage();
+  }
 } else {
   appStorage = new MemStorage();
   console.log('DATABASE_URL not found, using in-memory storage');

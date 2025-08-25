@@ -9,16 +9,8 @@ const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
-// PostgreSQL session store
-const PgSession = connectPgSimple(session);
-const sql = neon(process.env.DATABASE_URL!);
-
-// Session configuration
-app.use(session({
-  store: new PgSession({
-    conString: process.env.DATABASE_URL,
-    createTableIfMissing: true,
-  }),
+// Session configuration with fallback
+let sessionConfig: any = {
   secret: process.env.SESSION_SECRET || 'chat-app-secret-key-change-in-production',
   resave: false,
   saveUninitialized: false,
@@ -28,7 +20,21 @@ app.use(session({
     maxAge: 24 * 60 * 60 * 1000, // 24 hours
     sameSite: process.env.NODE_ENV === 'production' ? 'strict' : 'lax'
   }
-}));
+};
+
+// Use PostgreSQL session store if DATABASE_URL is available
+if (process.env.DATABASE_URL) {
+  const PgSession = connectPgSimple(session);
+  sessionConfig.store = new PgSession({
+    conString: process.env.DATABASE_URL,
+    createTableIfMissing: true,
+  });
+  console.log('Using PostgreSQL session store');
+} else {
+  console.log('DATABASE_URL not found, using default MemoryStore for sessions');
+}
+
+app.use(session(sessionConfig));
 
 app.use((req, res, next) => {
   const start = Date.now();

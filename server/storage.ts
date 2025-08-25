@@ -198,8 +198,11 @@ export class DatabaseStorage implements IStorage {
   private db;
   private logs: LogEntry[] = []; // Keep logs in memory for now
 
-  constructor() {
-    const sql = neon(process.env.DATABASE_URL!);
+  constructor(databaseUrl: string) {
+    if (!databaseUrl) {
+      throw new Error('Database URL is required for DatabaseStorage');
+    }
+    const sql = neon(databaseUrl);
     this.db = drizzle(sql);
   }
 
@@ -325,5 +328,5 @@ export class DatabaseStorage implements IStorage {
   }
 }
 
-// Use database storage instead of memory storage
-export const storage = new DatabaseStorage();
+// Export storage instance conditionally
+export const storage = process.env.DATABASE_URL ? new DatabaseStorage(process.env.DATABASE_URL) : new MemStorage();
