@@ -26,6 +26,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         contextualPrompt = `Kontext předchozí konverzace:\n${contextMessages}\n\nNová zpráva uživatele: ${prompt}`;
       }
 
+      const requestBody = {
+        model: model || "llama2:7b",
+        prompt: contextualPrompt,
+        stream: stream || false
+      };
+
+      console.log('JSON posílaný na ngrok:', JSON.stringify(requestBody, null, 2));
+
       // Forward request to ngrok endpoint
       const response = await fetch('https://0c8125184293.ngrok-free.app/api/generate', {
         method: 'POST',
@@ -33,11 +41,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           'Content-Type': 'application/json',
           'User-Agent': 'ReplichatBot/1.0'
         },
-        body: JSON.stringify({
-          model: model || "llama2:7b",
-          prompt: contextualPrompt,
-          stream: stream || false
-        })
+        body: JSON.stringify(requestBody)
       });
 
       console.log(`Ngrok response status: ${response.status} ${response.statusText}`);
