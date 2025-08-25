@@ -45,12 +45,106 @@ export async function registerRoutes(app: Express): Promise<Server> {
     });
   });
 
+  // Railway network debugging endpoint
+  app.post('/api/debug/network', async (req, res) => {
+    const { testUrl } = req.body;
+    const targetUrl = testUrl || 'https://0c8125184293.ngrok-free.app';
+    
+    try {
+      console.log('=== NETWORK DEBUG TEST ===');
+      console.log('Testing URL:', targetUrl);
+      console.log('Platform:', process.env.RAILWAY_ENVIRONMENT ? 'Railway' : 'Replit');
+      console.log('Node version:', process.version);
+      
+      await storage.addLog('info', 'Starting network debug test', { 
+        targetUrl,
+        platform: process.env.RAILWAY_ENVIRONMENT ? 'railway' : 'replit' 
+      });
+
+      // Test basic connectivity
+      const testResponse = await fetch(targetUrl, {
+        method: 'HEAD',
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (compatible; ReplichatBot/1.0)',
+          'ngrok-skip-browser-warning': 'true'
+        },
+        signal: AbortSignal.timeout(10000)
+      });
+
+      console.log('Head request response:', testResponse.status, testResponse.statusText);
+
+      // Test full POST request
+      const fullTest = await fetch(`${targetUrl}/api/generate`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'User-Agent': 'Mozilla/5.0 (compatible; ReplichatBot/1.0)',
+          'ngrok-skip-browser-warning': 'true'
+        },
+        body: JSON.stringify({
+          model: 'llama2:7b',
+          prompt: 'debug test from Railway',
+          stream: false
+        }),
+        signal: AbortSignal.timeout(15000)
+      });
+
+      console.log('Full POST test response:', fullTest.status, fullTest.statusText);
+      
+      await storage.addLog('info', 'Network debug test completed', { 
+        headStatus: testResponse.status,
+        postStatus: fullTest.status,
+        success: true
+      });
+
+      res.json({
+        success: true,
+        results: {
+          headTest: {
+            status: testResponse.status,
+            statusText: testResponse.statusText,
+            headers: JSON.stringify([...testResponse.headers.entries()])
+          },
+          postTest: {
+            status: fullTest.status,
+            statusText: fullTest.statusText,
+            contentType: fullTest.headers.get('content-type')
+          }
+        },
+        platform: process.env.RAILWAY_ENVIRONMENT ? 'railway' : 'replit',
+        targetUrl
+      });
+      
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      console.error('=== NETWORK DEBUG ERROR ===');
+      console.error('Error:', errorMessage);
+      console.error('Error type:', error instanceof Error ? error.constructor.name : typeof error);
+      
+      await storage.addLog('error', 'Network debug test failed', { 
+        error: errorMessage,
+        targetUrl,
+        platform: process.env.RAILWAY_ENVIRONMENT ? 'railway' : 'replit'
+      });
+
+      res.status(500).json({
+        success: false,
+        error: errorMessage,
+        errorType: error instanceof Error ? error.constructor.name : typeof error,
+        platform: process.env.RAILWAY_ENVIRONMENT ? 'railway' : 'replit',
+        targetUrl,
+        suggestion: 'Network connectivity issue - Railway may be blocking outbound connections'
+      });
+    }
+  });
+
   // Proxy endpoint for ngrok communication
   app.post('/api/generate', async (req, res) => {
     try {
       const { prompt, model, stream, ngrokUrl } = req.body;
       
       if (!prompt) {
+        await storage.addLog('error', 'Generate request missing prompt', { body: req.body });
         return res.status(400).json({ error: 'Prompt is required' });
       }
 
@@ -60,51 +154,160 @@ export async function registerRoutes(app: Express): Promise<Server> {
         stream: stream || false
       };
 
-      const targetUrl = ngrokUrl || 'https://0c8125184293.ngrok-free.app';
+      // Zkus získat ngrok URL z nastavení, pokud není v request
+      const savedNgrokUrl = await storage.getNgrokUrl();
+      const targetUrl = ngrokUrl || savedNgrokUrl || 'https://0c8125184293.ngrok-free.app';
       const fullUrl = `${targetUrl}/api/generate`;
 
-      await storage.addLog('info', `AI request to ${fullUrl}`, { prompt: prompt.substring(0, 100) });
+      console.log('=== GENERATE REQUEST DEBUG ===');
+      console.log('Request body from frontend:', JSON.stringify(req.body, null, 2));
+      console.log('Target ngrok URL:', targetUrl);
+      console.log('Full URL:', fullUrl);
+      console.log('Request body to ngrok:', JSON.stringify(requestBody, null, 2));
+      console.log('===============================');
 
-      console.log('JSON posílaný na ngrok:', JSON.stringify(requestBody, null, 2));
-      console.log('Target URL:', fullUrl);
-
-      // Forward request to ngrok endpoint
-      const response = await fetch(fullUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'User-Agent': 'ReplichatBot/1.0'
-        },
-        body: JSON.stringify(requestBody)
+      await storage.addLog('info', `Starting AI request to ${fullUrl}`, { 
+        prompt: prompt.substring(0, 100),
+        model: requestBody.model,
+        targetUrl: targetUrl
       });
 
-      console.log(`Ngrok response status: ${response.status} ${response.statusText}`);
-      
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.log('Ngrok error response:', errorText.substring(0, 200));
-        await storage.addLog('error', `Ngrok API error: ${response.status}`, { url: fullUrl, error: errorText.substring(0, 200) });
-        throw new Error(`Ngrok API error: ${response.status} ${response.statusText}`);
-      }
+      // Přidej ngrok-specifické headers
+      const headers = {
+        'Content-Type': 'application/json',
+        'User-Agent': 'Mozilla/5.0 (compatible; ReplichatBot/1.0)',
+        'Accept': 'application/json',
+        'ngrok-skip-browser-warning': 'true'
+      };
 
-      const contentType = response.headers.get('content-type');
-      if (!contentType || !contentType.includes('application/json')) {
-        const text = await response.text();
-        console.log('Non-JSON response from ngrok:', text.substring(0, 200));
-        await storage.addLog('error', 'Ngrok returned non-JSON response', { url: fullUrl, response: text.substring(0, 200) });
-        throw new Error('Ngrok endpoint returned non-JSON response (probably HTML error page)');
-      }
+      console.log('Request headers:', headers);
 
-      const data = await response.json();
-      await storage.addLog('info', 'AI request successful', { responseLength: JSON.stringify(data).length });
-      res.json(data);
+      // Forward request to ngrok endpoint s timeout
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
+
+      try {
+        const response = await fetch(fullUrl, {
+          method: 'POST',
+          headers: headers,
+          body: JSON.stringify(requestBody),
+          signal: controller.signal
+        });
+
+        clearTimeout(timeoutId);
+
+        console.log(`=== NGROK RESPONSE DEBUG ===`);
+        console.log(`Status: ${response.status} ${response.statusText}`);
+        console.log('Response headers:', JSON.stringify([...response.headers.entries()]));
+        console.log(`============================`);
+        
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.log('Ngrok error response body:', errorText);
+          await storage.addLog('error', `Ngrok API error: ${response.status}`, { 
+            url: fullUrl, 
+            status: response.status,
+            statusText: response.statusText,
+            error: errorText.substring(0, 500),
+            headers: JSON.stringify([...response.headers.entries()])
+          });
+          
+          // Vrať detailnější error info
+          return res.status(500).json({ 
+            error: 'AI service error',
+            details: `Ngrok responded with ${response.status}: ${errorText.substring(0, 200)}`,
+            ngrokUrl: fullUrl,
+            status: response.status
+          });
+        }
+
+        const contentType = response.headers.get('content-type');
+        console.log('Response content-type:', contentType);
+        
+        if (!contentType || !contentType.includes('application/json')) {
+          const text = await response.text();
+          console.log('Non-JSON response from ngrok:', text.substring(0, 500));
+          await storage.addLog('error', 'Ngrok returned non-JSON response', { 
+            url: fullUrl, 
+            contentType: contentType,
+            response: text.substring(0, 500) 
+          });
+          
+          return res.status(500).json({
+            error: 'Invalid response from AI service',
+            details: `Expected JSON but got ${contentType}`,
+            preview: text.substring(0, 200)
+          });
+        }
+
+        const data = await response.json();
+        console.log('Ngrok response data:', JSON.stringify(data).substring(0, 200) + '...');
+        
+        await storage.addLog('info', 'AI request successful', { 
+          responseLength: JSON.stringify(data).length,
+          hasResponse: !!data.response
+        });
+        
+        res.json(data);
+        
+      } catch (fetchError: unknown) {
+        clearTimeout(timeoutId);
+        
+        if (fetchError instanceof Error && fetchError.name === 'AbortError') {
+          console.log('Request to ngrok timed out after 30 seconds');
+          await storage.addLog('error', 'Ngrok request timeout', { url: fullUrl, timeout: '30s' });
+          return res.status(408).json({
+            error: 'AI service timeout',
+            details: 'Request to ngrok timed out after 30 seconds'
+          });
+        }
+        
+        throw fetchError;
+      }
       
-    } catch (error) {
-      console.error('Proxy error:', error);
-      await storage.addLog('error', 'Proxy error in /api/generate', { error: error instanceof Error ? error.message : 'Unknown error' });
+    } catch (error: unknown) {
+      console.error('=== PROXY ERROR ===');
+      console.error('Error type:', error instanceof Error ? error.constructor.name : typeof error);
+      console.error('Error message:', error instanceof Error ? error.message : String(error));
+      console.error('Full error:', error);
+      console.error('==================');
+      
+      // Speciální handling pro Railway network issues
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      const isNetworkError = errorMessage.includes('ENOTFOUND') || 
+                           errorMessage.includes('ECONNREFUSED') || 
+                           errorMessage.includes('ETIMEDOUT') ||
+                           errorMessage.includes('network') ||
+                           errorMessage.includes('fetch failed');
+      
+      if (isNetworkError) {
+        console.log('=== NETWORK ERROR DETECTED - LIKELY RAILWAY ISSUE ===');
+        await storage.addLog('error', 'Network error - Railway cannot reach ngrok', { 
+          error: errorMessage,
+          isNetworkError: true,
+          platform: process.env.RAILWAY_ENVIRONMENT ? 'railway' : 'replit',
+          suggestions: 'Check if Railway allows outbound connections to ngrok URLs'
+        });
+        
+        return res.status(503).json({
+          error: 'Network connectivity issue',
+          details: 'Cannot reach AI service. Railway may be blocking outbound connections.',
+          suggestions: 'Try updating ngrok URL or check Railway network policies',
+          isNetworkError: true
+        });
+      }
+      
+      await storage.addLog('error', 'Proxy error in /api/generate', { 
+        error: errorMessage,
+        errorType: error instanceof Error ? error.constructor.name : typeof error,
+        stack: error instanceof Error ? error.stack : undefined,
+        platform: process.env.RAILWAY_ENVIRONMENT ? 'railway' : 'replit'
+      });
+      
       res.status(500).json({ 
         error: 'Failed to connect to AI service',
-        details: error instanceof Error ? error.message : 'Unknown error'
+        details: errorMessage,
+        errorType: error instanceof Error ? error.constructor.name : typeof error
       });
     }
   });
@@ -142,33 +345,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Endpoint pro načtení logů
-  app.get('/api/logs', async (req, res) => {
-    try {
-      console.log('Fetching logs, session:', !!req.session);
-      const limit = parseInt(req.query.limit as string) || 50;
-      const logs = await storage.getLogs(limit);
-      console.log('Found logs:', logs.length);
-      res.json({ logs });
-    } catch (error) {
-      console.error('Error fetching logs:', error);
-      res.status(500).json({ error: 'Failed to fetch logs' });
-    }
-  });
-
-  // Endpoint pro načtení errorů
-  app.get('/api/errors', async (req, res) => {
-    try {
-      console.log('Fetching errors, session:', !!req.session);
-      const limit = parseInt(req.query.limit as string) || 50;
-      const errors = await storage.getErrors(limit);
-      console.log('Found errors:', errors.length);
-      res.json({ errors });
-    } catch (error) {
-      console.error('Error fetching errors:', error);
-      res.status(500).json({ error: 'Failed to fetch errors' });
-    }
-  });
 
   // Auth endpoints
   app.post('/api/auth/register', async (req, res) => {
