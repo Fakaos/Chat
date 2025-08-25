@@ -88,6 +88,12 @@ export default function Home({ currentUser, isGuest, onLogout }: HomeProps) {
 
   const chatMutation = useMutation({
     mutationFn: async (prompt: string): Promise<LlamaResponse> => {
+      // Získej posledních 5 zpráv jako kontext pro roleplay
+      const recentMessages = messages.slice(-5).map(msg => ({
+        type: msg.type,
+        content: msg.content
+      }));
+
       const response = await fetch('/api/generate', {
         method: 'POST',
         headers: {
@@ -96,6 +102,7 @@ export default function Home({ currentUser, isGuest, onLogout }: HomeProps) {
         body: JSON.stringify({
           model: aiModel,
           prompt: prompt,
+          history: recentMessages,
           stream: false,
           ngrokUrl: ngrokUrl
         })
