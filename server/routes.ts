@@ -23,7 +23,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
           return `${role}: ${msg.content}`;
         }).join('\n');
         
-        contextualPrompt = `Kontext předchozí konverzace:\n${contextMessages}\n\nNová zpráva uživatele: ${prompt}`;
+        contextualPrompt = `Jsi v roleplay konverzaci s uživatelem. Pokračuj v konverzaci přirozeně na základě kontextu. Nekomentuj, že rozumíš kontextu - jednoduše odpověz na novou zprávu.
+
+Předchozí konverzace:
+${contextMessages}
+
+Nová zpráva uživatele: ${prompt}`;
       }
 
       const requestBody = {
