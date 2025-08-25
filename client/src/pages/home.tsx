@@ -143,27 +143,15 @@ export default function Home({ currentUser, isGuest, onLogout }: HomeProps) {
 
     if (chatMutation.isPending) return;
 
-    // Pokud není aktuální chat a uživatel není guest, vytvoř nový chat
+    // Pokud není aktuální chat a uživatel není guest, použij warning
     let chatId = currentChatId;
     if (!isGuest && !chatId && currentUser) {
-      try {
-        const response = await fetch('/api/chats', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ title: `Chat ${Date.now()}` })
-        });
-        
-        if (response.ok) {
-          const data = await response.json();
-          chatId = data.chat.id;
-          setCurrentChatId(chatId);
-          queryClient.invalidateQueries({ queryKey: ['chats'] });
-        }
-      } catch (error) {
-        console.error('Error creating chat:', error);
-      }
+      toast({
+        title: "Vytvořte nový chat",
+        description: "Prosím klikněte na 'Nový chat' v postranním panelu.",
+        variant: "destructive"
+      });
+      return;
     }
 
     // Přidej user zprávu ihned
@@ -364,30 +352,7 @@ export default function Home({ currentUser, isGuest, onLogout }: HomeProps) {
   const handleNewChat = async () => {
     setCurrentChatId(null);
     setMessages([]);
-    
-    // Vytvoř nový chat ihned pro přihlášené uživatele
-    if (!isGuest && currentUser) {
-      try {
-        const response = await fetch('/api/chats', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ title: `Chat ${new Date().toLocaleString('cs-CZ')}` })
-        });
-        
-        if (response.ok) {
-          const data = await response.json();
-          setCurrentChatId(data.chat.id);
-          queryClient.invalidateQueries({ queryKey: ['chats'] });
-          console.log('New chat created:', data.chat.id);
-        } else {
-          console.error('Failed to create chat:', response.status);
-        }
-      } catch (error) {
-        console.error('Error creating new chat:', error);
-      }
-    }
+    console.log('New chat initiated from home');
   };
 
   return (
