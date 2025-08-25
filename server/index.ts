@@ -13,31 +13,30 @@ app.set('trust proxy', 1);
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
-// Session configuration with proper Railway support
+// Session configuration - use MemoryStore for Replit development
 let sessionConfig: any = {
-  secret: process.env.SESSION_SECRET || 'chat-app-secret-key-change-in-production',
+  secret: process.env.SESSION_SECRET || 'replit-chat-app-session-secret-2025',
   resave: false,
-  saveUninitialized: true, // Change to true to ensure session gets created
+  saveUninitialized: true,
   cookie: {
-    secure: false, // Railway uses reverse proxy, keep false
+    secure: false, // Keep false for Replit
     httpOnly: true,
     maxAge: 24 * 60 * 60 * 1000, // 24 hours
     sameSite: 'lax',
-    path: '/' // Explicitly set path
   },
   name: 'sessionId'
 };
 
-// Use PostgreSQL session store if DATABASE_URL is available
-if (process.env.DATABASE_URL) {
+// For production Railway, use PostgreSQL session store
+if (process.env.NODE_ENV === 'production' && process.env.DATABASE_URL?.includes('railway')) {
   const PgSession = connectPgSimple(session);
   sessionConfig.store = new PgSession({
     conString: process.env.DATABASE_URL,
     createTableIfMissing: true,
   });
-  console.log('Using PostgreSQL session store');
+  console.log('Using PostgreSQL session store for production');
 } else {
-  console.log('DATABASE_URL not found, using default MemoryStore for sessions');
+  console.log('Using MemoryStore for development sessions');
 }
 
 app.use(session(sessionConfig));

@@ -360,22 +360,19 @@ export class DatabaseStorage implements IStorage {
     try {
       console.log('Checking database tables...');
       
-      // Check if tables exist using information_schema
-      const pool = (this.db as any)._.session.client;
-      const result = await pool.query(`
-        SELECT table_name FROM information_schema.tables 
-        WHERE table_schema = 'public' AND table_name IN ('users', 'chats', 'messages', 'settings')
-      `);
-      
-      if (result.rows.length >= 4) {
-        console.log('All required tables exist, skipping initialization');
+      // Try to query one of the tables to see if they exist
+      try {
+        await this.db.select().from(users).limit(1);
+        console.log('Database tables exist and are accessible');
         return;
+      } catch (tableError: any) {
+        if (tableError.message?.includes('relation') && tableError.message?.includes('does not exist')) {
+          console.log('Tables do not exist, they need to be created');
+          console.log('Please run: npm run db:push');
+        } else {
+          console.log('Tables exist and are accessible');
+        }
       }
-      
-      console.log('Some tables missing, checking what we have:', result.rows.map((r: any) => r.table_name));
-      
-      // Tables already exist, let's just verify they work
-      console.log('Tables already exist in database, using existing schema');
       
     } catch (error) {
       console.error('Error checking tables:', error);
