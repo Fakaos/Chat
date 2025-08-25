@@ -24,13 +24,10 @@ export default function Home() {
 
   const chatMutation = useMutation({
     mutationFn: async (prompt: string): Promise<LlamaResponse> => {
-      const response = await fetch('https://0c8125184293.ngrok-free.app/api/generate', {
+      const response = await fetch('/api/generate', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'ngrok-skip-browser-warning': 'true',
-          'Accept': 'application/json',
-          'Origin': window.location.origin,
         },
         body: JSON.stringify({
           model: "llama2:7b",
