@@ -360,9 +360,33 @@ export default function Home({ currentUser, isGuest, onLogout }: HomeProps) {
     }
   };
 
-  const handleNewChat = () => {
+  const handleNewChat = async () => {
     setCurrentChatId(null);
     setMessages([]);
+    
+    // Vytvoř nový chat ihned pro přihlášené uživatele
+    if (!isGuest && currentUser) {
+      try {
+        const response = await fetch('/api/chats', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ title: `Chat ${new Date().toLocaleString('cs-CZ')}` })
+        });
+        
+        if (response.ok) {
+          const data = await response.json();
+          setCurrentChatId(data.chat.id);
+          queryClient.invalidateQueries({ queryKey: ['chats'] });
+          console.log('New chat created:', data.chat.id);
+        } else {
+          console.error('Failed to create chat:', response.status);
+        }
+      } catch (error) {
+        console.error('Error creating new chat:', error);
+      }
+    }
   };
 
   return (
