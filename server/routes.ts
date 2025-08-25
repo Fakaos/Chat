@@ -45,6 +45,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
     });
   });
 
+  // Add test data endpoint for debugging
+  app.post('/api/test/add-logs', async (req, res) => {
+    try {
+      // Add some test logs
+      await storage.addLog('info', 'Uživatel se přihlásil', { username: 'testuser' });
+      await storage.addLog('info', 'Chat byl vytvořen', { chatId: 'test-123', title: 'Test Chat' });
+      await storage.addLog('warn', 'Pomalé připojení k AI serveru', { responseTime: 5000 });
+      await storage.addLog('error', 'Chyba při připojení k ngrok', { error: 'Connection timeout', url: 'https://test.ngrok.io' });
+      await storage.addLog('info', 'AI odpověď úspěšně doručena', { tokens: 150, model: 'llama2:7b' });
+      
+      res.json({ 
+        message: 'Test logs added successfully!',
+        count: 5
+      });
+    } catch (error) {
+      console.error('Error adding test logs:', error);
+      res.status(500).json({ error: 'Failed to add test logs' });
+    }
+  });
+
   // Railway network debugging endpoint
   app.post('/api/debug/network', async (req, res) => {
     const { testUrl } = req.body;
