@@ -1,1 +1,1 @@
-web: npm run build && NODE_ENV=production node dist/prod.js
+web: vite build && npx esbuild server/prod.ts --platform=node --packages=external --bundle --format=esm --outdir=dist && NODE_ENV=production node dist/prod.js

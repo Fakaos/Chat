@@ -29,6 +29,9 @@ export interface IStorage {
   // Message methods
   getChatMessages(chatId: string): Promise<Message[]>;
   createMessage(message: InsertMessage): Promise<Message>;
+  // Ngrok URL methods
+  getNgrokUrl(): Promise<string | undefined>;
+  setNgrokUrl(url: string): Promise<void>;
 }
 
 export class MemStorage implements IStorage {
@@ -106,6 +109,15 @@ export class MemStorage implements IStorage {
       .filter(log => log.level === 'error')
       .slice(-limit)
       .reverse();
+  }
+
+  async getNgrokUrl(): Promise<string | undefined> {
+    const setting = await this.getSettingByKey('ngrok_url');
+    return setting?.value;
+  }
+
+  async setNgrokUrl(url: string): Promise<void> {
+    await this.upsertSetting('ngrok_url', url);
   }
 
   // Chat methods

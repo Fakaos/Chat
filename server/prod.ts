@@ -1,11 +1,7 @@
 import express, { type Request, Response, NextFunction } from "express";
 import session from "express-session";
 import path from "path";
-import { fileURLToPath } from 'url';
 import { storage } from "./storage";
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
 
 const app = express();
 app.use(express.json());
@@ -359,7 +355,7 @@ app.post('/api/generate', async (req, res) => {
 });
 
 // Serve static files (built frontend)
-const staticPath = path.resolve(__dirname, '..', 'dist', 'public');
+const staticPath = path.resolve(import.meta.dirname, '..', 'dist', 'public');
 app.use(express.static(staticPath));
 
 // Catch-all handler for frontend routing
