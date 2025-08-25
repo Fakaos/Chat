@@ -152,6 +152,7 @@ export default function Home({ currentUser, isGuest, onLogout }: HomeProps) {
           credentials: 'include',
           headers: {
             'Content-Type': 'application/json',
+            'Accept': 'application/json',
           },
           body: JSON.stringify({ title: `Chat ${new Date().toLocaleString('cs-CZ').slice(0, 16)}` })
         });

@@ -17,12 +17,13 @@ app.use(express.urlencoded({ extended: false }));
 let sessionConfig: any = {
   secret: process.env.SESSION_SECRET || 'chat-app-secret-key-change-in-production',
   resave: false,
-  saveUninitialized: false,
+  saveUninitialized: true, // Change to true to ensure session gets created
   cookie: {
     secure: false, // Railway uses reverse proxy, keep false
     httpOnly: true,
     maxAge: 24 * 60 * 60 * 1000, // 24 hours
-    sameSite: 'lax'
+    sameSite: 'lax',
+    path: '/' // Explicitly set path
   },
   name: 'sessionId'
 };

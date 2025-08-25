@@ -42,6 +42,7 @@ export default function ChatSidebar({
         credentials: 'include', // Include session cookies
         headers: {
           'Content-Type': 'application/json',
+          'Accept': 'application/json',
         }
       });
       
@@ -85,6 +86,7 @@ export default function ChatSidebar({
         credentials: 'include',
         headers: {
           'Content-Type': 'application/json',
+          'Accept': 'application/json',
         },
         body: JSON.stringify({ title })
       });
@@ -126,6 +128,7 @@ export default function ChatSidebar({
         credentials: 'include',
         headers: {
           'Content-Type': 'application/json',
+          'Accept': 'application/json',
         },
         body: JSON.stringify({ title })
       });

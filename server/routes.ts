@@ -10,10 +10,16 @@ declare module 'express-serve-static-core' {
 }
 
 export async function registerRoutes(app: Express): Promise<Server> {
-  // CORS and error handling middleware
+  // CORS and error handling middleware  
   app.use('/api', (req, res, next) => {
-    // Add CORS headers for Railway
-    res.header('Access-Control-Allow-Origin', req.headers.origin || '*');
+    // Add CORS headers for Railway - can't use * with credentials
+    const origin = req.headers.origin;
+    if (origin) {
+      res.header('Access-Control-Allow-Origin', origin);
+    } else {
+      // Fallback for direct requests
+      res.header('Access-Control-Allow-Origin', 'http://localhost:5000');
+    }
     res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
     res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization, Cookie');
     res.header('Access-Control-Allow-Credentials', 'true');
@@ -270,7 +276,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get('/api/auth/me', async (req, res) => {
     try {
-      console.log('Auth check:', { hasSession: !!req.session, sessionUserId: req.session?.userId });
+      console.log('Auth check:', { 
+        hasSession: !!req.session, 
+        sessionUserId: req.session?.userId,
+        sessionId: req.session?.id,
+        cookies: req.headers.cookie,
+        sessionData: req.session
+      });
       
       if (!req.session) {
         console.log('No session object');
@@ -279,7 +291,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const userId = req.session.userId;
       if (!userId) {
-        console.log('No userId in session');
+        console.log('No userId in session, regenerating session');
         return res.status(401).json({ error: 'Not authenticated' });
       }
 
@@ -289,6 +301,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ error: 'User not found' });
       }
 
+      console.log('Auth successful for user:', user.id);
       res.json({ 
         user: { id: user.id, username: user.username } 
       });
@@ -301,12 +314,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Chat endpoints
   app.get('/api/chats', async (req, res) => {
     try {
-      const userId = req.session.userId;
+      console.log('Fetching chats for session:', { 
+        hasSession: !!req.session, 
+        sessionUserId: req.session?.userId,
+        cookies: req.headers.cookie?.substring(0, 100) 
+      });
+      
+      const userId = req.session?.userId;
       if (!userId) {
+        console.log('Chats request - no userId in session');
         return res.status(401).json({ error: 'Not authenticated' });
       }
 
       const chats = await storage.getUserChats(userId);
+      console.log(`Found ${chats.length} chats for user ${userId}`);
       res.json({ chats });
     } catch (error) {
       console.error('Error fetching chats:', error);
@@ -316,14 +337,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post('/api/chats', async (req, res) => {
     try {
-      const userId = req.session.userId;
+      console.log('Creating chat for session:', { 
+        hasSession: !!req.session, 
+        sessionUserId: req.session?.userId,
+        body: req.body,
+        cookies: req.headers.cookie?.substring(0, 100) 
+      });
+      
+      const userId = req.session?.userId;
       const { title } = req.body;
       
       if (!userId) {
+        console.log('Chat creation - no userId in session');
         return res.status(401).json({ error: 'Not authenticated' });
       }
 
       const chat = await storage.createChat({ userId, title });
+      console.log('Chat created successfully:', chat.id);
       res.json({ chat });
     } catch (error) {
       console.error('Error creating chat:', error);
