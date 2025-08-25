@@ -120,6 +120,38 @@ app.post('/api/settings/ngrok-url', async (req, res) => {
   }
 });
 
+// Admin AI model endpoints
+app.get('/api/admin/ai-model', async (req, res) => {
+  try {
+    const aiModel = await appStorage.getAiModel();
+    res.json({ aiModel: aiModel || 'llama2:7b' });
+  } catch (error) {
+    console.error('Error fetching AI model:', error);
+    res.status(500).json({ error: 'Failed to fetch AI model' });
+  }
+});
+
+app.post('/api/admin/ai-model', async (req, res) => {
+  try {
+    const { aiModel } = req.body;
+    
+    if (!aiModel || typeof aiModel !== 'string') {
+      return res.status(400).json({ error: 'AI model is required' });
+    }
+
+    await appStorage.setAiModel(aiModel);
+    const user = req.session?.userId ? await appStorage.getUser(req.session.userId) : null;
+    await appStorage.addLog('info', 'AI model changed', { newModel: aiModel }, user?.id, user?.username, 'change_ai_model');
+    
+    res.json({ aiModel });
+  } catch (error) {
+    console.error('Error saving AI model:', error);
+    const user = req.session?.userId ? await appStorage.getUser(req.session.userId) : null;
+    await appStorage.addLog('error', 'Failed to save AI model', { error: error instanceof Error ? error.message : 'Unknown error' }, user?.id, user?.username, 'change_ai_model');
+    res.status(500).json({ error: 'Failed to save AI model' });
+  }
+});
+
 // Logs endpoints
 app.get('/api/logs', async (req, res) => {
   try {

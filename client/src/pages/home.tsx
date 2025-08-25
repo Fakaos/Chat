@@ -39,6 +39,8 @@ export default function Home({ currentUser, isGuest, onLogout }: HomeProps) {
   const [isAdminAuthenticated, setIsAdminAuthenticated] = useState(false);
   const [ngrokUrl, setNgrokUrl] = useState("https://0c8125184293.ngrok-free.app");
   const [tempNgrokUrl, setTempNgrokUrl] = useState("");
+  const [tempAiModel, setTempAiModel] = useState("");
+  const [aiModel, setAiModel] = useState("llama2:7b");
   const [isLoadingUrl, setIsLoadingUrl] = useState(true);
   const [showLogs, setShowLogs] = useState(false);
   const [showErrors, setShowErrors] = useState(false);
@@ -47,21 +49,33 @@ export default function Home({ currentUser, isGuest, onLogout }: HomeProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  // Načtení ngrok URL při načtení komponenty
+  // Načtení ngrok URL a AI modelu při načtení komponenty
   useEffect(() => {
-    const loadNgrokUrl = async () => {
+    const loadSettings = async () => {
       try {
-        const response = await fetch('/api/settings/ngrok-url');
-        console.log('Response status:', response.status);
-        if (response.ok) {
-          const data = await response.json();
+        // Load ngrok URL
+        const ngrokResponse = await fetch('/api/settings/ngrok-url');
+        console.log('Ngrok response status:', ngrokResponse.status);
+        if (ngrokResponse.ok) {
+          const data = await ngrokResponse.json();
           console.log('Loaded ngrok URL:', data.ngrokUrl);
           setNgrokUrl(data.ngrokUrl);
         } else {
-          console.error('Failed to load ngrok URL, status:', response.status);
+          console.error('Failed to load ngrok URL, status:', ngrokResponse.status);
+        }
+        
+        // Load AI model
+        const modelResponse = await fetch('/api/admin/ai-model');
+        console.log('AI model response status:', modelResponse.status);
+        if (modelResponse.ok) {
+          const modelData = await modelResponse.json();
+          console.log('Loaded AI model:', modelData.aiModel);
+          setAiModel(modelData.aiModel);
+        } else {
+          console.error('Failed to fetch AI model');
         }
       } catch (error) {
-        console.error('Error loading ngrok URL:', error);
+        console.error('Error loading settings:', error);
         // Fallback na default hodnotu
         setNgrokUrl("https://0c8125184293.ngrok-free.app");
       } finally {
@@ -69,7 +83,7 @@ export default function Home({ currentUser, isGuest, onLogout }: HomeProps) {
       }
     };
 
-    loadNgrokUrl();
+    loadSettings();
   }, []);
 
   const chatMutation = useMutation({
@@ -80,7 +94,7 @@ export default function Home({ currentUser, isGuest, onLogout }: HomeProps) {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          model: "llama2:7b",
+          model: aiModel,
           prompt: prompt,
           stream: false,
           ngrokUrl: ngrokUrl
@@ -158,7 +172,7 @@ export default function Home({ currentUser, isGuest, onLogout }: HomeProps) {
         });
         
         if (response.ok) {
-          const data = await response.json();
+          const data = await ngrokResponse.json();
           chatId = data.chat.id;
           setCurrentChatId(chatId);
           queryClient.invalidateQueries({ queryKey: ['user-chats'] });
@@ -230,6 +244,7 @@ export default function Home({ currentUser, isGuest, onLogout }: HomeProps) {
       setIsAdminAuthenticated(true);
       // Nastavit tempNgrokUrl na aktuální ngrokUrl při přihlášení
       setTempNgrokUrl(ngrokUrl || "https://0c8125184293.ngrok-free.app");
+      setTempAiModel(aiModel);
       toast({
         title: "Přihlášení úspěšné",
         description: "Vítejte v admin panelu!",
@@ -280,6 +295,46 @@ export default function Home({ currentUser, isGuest, onLogout }: HomeProps) {
   const handleSaveNgrokUrl = () => {
     if (tempNgrokUrl.trim()) {
       saveNgrokUrlMutation.mutate(tempNgrokUrl.trim());
+    }
+  };
+
+  const saveAiModelMutation = useMutation({
+    mutationFn: async (model: string) => {
+      const response = await fetch('/api/admin/ai-model', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ aiModel: model })
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to save AI model');
+      }
+      
+      return response.json();
+    },
+    onSuccess: (data) => {
+      setAiModel(data.aiModel);
+      setTempAiModel(data.aiModel);
+      toast({
+        title: "Úspěch",
+        description: "AI model byl úspěšně uložen."
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Chyba",
+        description: "Nepodařilo se uložit AI model.",
+        variant: "destructive"
+      });
+      console.error('Error saving AI model:', error);
+    }
+  });
+
+  const handleSaveAiModel = () => {
+    if (tempAiModel.trim()) {
+      saveAiModelMutation.mutate(tempAiModel.trim());
     }
   };
 
@@ -447,32 +502,61 @@ export default function Home({ currentUser, isGuest, onLogout }: HomeProps) {
               <div className="space-y-4">
                 {!showLogs && !showErrors ? (
                   <>
-                    <div className="space-y-2">
-                      <label htmlFor="ngrok-url" className="text-sm font-medium">
-                        Ngrok URL:
-                      </label>
-                      <Input
-                        id="ngrok-url"
-                        type="url"
-                        value={tempNgrokUrl}
-                        onChange={(e) => setTempNgrokUrl(e.target.value)}
-                        placeholder="https://xxxxx.ngrok-free.app"
-                        data-testid="input-ngrok-url"
-                      />
-                      <p className="text-xs text-slate-500">
-                        Aktuální: {isLoadingUrl ? 'Načítá se...' : ngrokUrl}
-                      </p>
+                    <div className="space-y-4">
+                      <div className="space-y-2">
+                        <label htmlFor="ngrok-url" className="text-sm font-medium">
+                          Ngrok URL:
+                        </label>
+                        <Input
+                          id="ngrok-url"
+                          type="url"
+                          value={tempNgrokUrl}
+                          onChange={(e) => setTempNgrokUrl(e.target.value)}
+                          placeholder="https://xxxxx.ngrok-free.app"
+                          data-testid="input-ngrok-url"
+                        />
+                        <p className="text-xs text-slate-500">
+                          Aktuální: {isLoadingUrl ? 'Načítá se...' : ngrokUrl}
+                        </p>
+                      </div>
+                      
+                      <div className="space-y-2">
+                        <label htmlFor="ai-model" className="text-sm font-medium">
+                          AI Model:
+                        </label>
+                        <Input
+                          id="ai-model"
+                          type="text"
+                          value={tempAiModel}
+                          onChange={(e) => setTempAiModel(e.target.value)}
+                          placeholder="llama2:7b"
+                          data-testid="input-ai-model"
+                        />
+                        <p className="text-xs text-slate-500">
+                          Aktuální: {aiModel}
+                        </p>
+                      </div>
                     </div>
-                    <div className="flex space-x-2">
-                      <Button 
-                        onClick={handleSaveNgrokUrl} 
-                        className="flex-1" 
-                        data-testid="button-save-url"
-                        disabled={saveNgrokUrlMutation.isPending}
-                      >
-                        {saveNgrokUrlMutation.isPending ? 'Ukládá se...' : 'Uložit URL'}
-                      </Button>
-                      <Button variant="outline" onClick={handleAdminLogout} className="flex-1">
+                    <div className="space-y-2">
+                      <div className="flex space-x-2">
+                        <Button 
+                          onClick={handleSaveNgrokUrl} 
+                          className="flex-1" 
+                          data-testid="button-save-url"
+                          disabled={saveNgrokUrlMutation.isPending}
+                        >
+                          {saveNgrokUrlMutation.isPending ? 'Ukládá URL...' : 'Uložit URL'}
+                        </Button>
+                        <Button 
+                          onClick={handleSaveAiModel} 
+                          className="flex-1" 
+                          data-testid="button-save-model"
+                          disabled={saveAiModelMutation.isPending}
+                        >
+                          {saveAiModelMutation.isPending ? 'Ukládá model...' : 'Uložit Model'}
+                        </Button>
+                      </div>
+                      <Button variant="outline" onClick={handleAdminLogout} className="w-full">
                         Odhlásit
                       </Button>
                     </div>

@@ -31,6 +31,9 @@ export interface IStorage {
   // Ngrok URL methods
   getNgrokUrl(): Promise<string | undefined>;
   setNgrokUrl(url: string): Promise<void>;
+  // AI Model methods
+  getAiModel(): Promise<string | undefined>;
+  setAiModel(model: string): Promise<void>;
 }
 
 export class MemStorage implements IStorage {
@@ -120,6 +123,15 @@ export class MemStorage implements IStorage {
 
   async setNgrokUrl(url: string): Promise<void> {
     await this.upsertSetting('ngrok_url', url);
+  }
+
+  async getAiModel(): Promise<string | undefined> {
+    const setting = await this.getSettingByKey('ai_model');
+    return setting?.value;
+  }
+
+  async setAiModel(model: string): Promise<void> {
+    await this.upsertSetting('ai_model', model);
   }
 
   // Chat methods
@@ -348,6 +360,15 @@ export class DatabaseStorage implements IStorage {
 
   async setNgrokUrl(url: string): Promise<void> {
     await this.upsertSetting('ngrok_url', url);
+  }
+
+  async getAiModel(): Promise<string | undefined> {
+    const setting = await this.getSettingByKey('ai_model');
+    return setting?.value;
+  }
+
+  async setAiModel(model: string): Promise<void> {
+    await this.upsertSetting('ai_model', model);
   }
 
   private initializeTables(): void {

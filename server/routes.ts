@@ -34,7 +34,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // prefix all routes with /api
   
   // Simple test endpoint
-  app.get('/api/test', (req, res) => {
+  app.get('/api/test', async (req, res) => {
+    console.log('Adding test log...');
+    await storage.addLog('info', 'Test endpoint accessed', { timestamp: new Date().toISOString() });
+    console.log('Test log added successfully');
     res.json({ 
       message: 'Backend is working!', 
       timestamp: new Date().toISOString(),
@@ -458,6 +461,65 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const user = req.session?.userId ? await storage.getUser(req.session.userId) : null;
       await storage.addLog('error', 'Failed to delete chat', { error: error instanceof Error ? error.message : 'Unknown error', chatId: req.params.chatId }, user?.id, user?.username, 'delete_chat');
       res.status(500).json({ error: 'Failed to delete chat' });
+    }
+  });
+
+  // Admin AI model endpoints
+  app.get('/api/admin/ai-model', async (req, res) => {
+    try {
+      const aiModel = await storage.getAiModel();
+      res.json({ aiModel: aiModel || 'llama2:7b' });
+    } catch (error) {
+      console.error('Error fetching AI model:', error);
+      res.status(500).json({ error: 'Failed to fetch AI model' });
+    }
+  });
+
+  app.post('/api/admin/ai-model', async (req, res) => {
+    try {
+      const { aiModel } = req.body;
+      
+      if (!aiModel || typeof aiModel !== 'string') {
+        return res.status(400).json({ error: 'AI model is required' });
+      }
+
+      await storage.setAiModel(aiModel);
+      const user = req.session?.userId ? await storage.getUser(req.session.userId) : null;
+      await storage.addLog('info', 'AI model changed', { newModel: aiModel }, user?.id, user?.username, 'change_ai_model');
+      
+      res.json({ aiModel });
+    } catch (error) {
+      console.error('Error saving AI model:', error);
+      const user = req.session?.userId ? await storage.getUser(req.session.userId) : null;
+      await storage.addLog('error', 'Failed to save AI model', { error: error instanceof Error ? error.message : 'Unknown error' }, user?.id, user?.username, 'change_ai_model');
+      res.status(500).json({ error: 'Failed to save AI model' });
+    }
+  });
+
+  // Logs and errors endpoints for admin panel
+  app.get('/api/logs', async (req, res) => {
+    try {
+      const limit = parseInt(req.query.limit as string) || 50;
+      console.log('Fetching logs, session:', !!req.session);
+      const logs = await storage.getLogs(limit);
+      console.log('Found logs:', logs.length);
+      res.json({ logs });
+    } catch (error) {
+      console.error('Error fetching logs:', error);
+      await storage.addLog('error', 'Failed to fetch logs', { error: error instanceof Error ? error.message : 'Unknown error' });
+      res.status(500).json({ error: 'Failed to fetch logs' });
+    }
+  });
+
+  app.get('/api/errors', async (req, res) => {
+    try {
+      const limit = parseInt(req.query.limit as string) || 50;
+      const errors = await storage.getErrors(limit);
+      res.json({ errors });
+    } catch (error) {
+      console.error('Error fetching errors:', error);
+      await storage.addLog('error', 'Failed to fetch errors', { error: error instanceof Error ? error.message : 'Unknown error' });
+      res.status(500).json({ error: 'Failed to fetch errors' });
     }
   });
 
