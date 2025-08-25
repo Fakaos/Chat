@@ -182,10 +182,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const user = await storage.createUser({ username, password });
       await storage.addLog('info', 'User registered', { username });
       
-      // Set session
+      // Set session with explicit save
       if (req.session) {
         req.session.userId = user.id;
-        console.log('Session set for user:', user.id);
+        await new Promise((resolve, reject) => {
+          req.session.save((err: any) => {
+            if (err) {
+              console.error('Registration session save error:', err);
+              reject(err);
+            } else {
+              console.log('Registration session saved for user:', user.id);
+              resolve(true);
+            }
+          });
+        });
       } else {
         console.log('No session available');
       }
@@ -218,10 +228,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ error: 'Invalid credentials' });
       }
 
-      // Set session
+      // Set session with explicit save
       if (req.session) {
         req.session.userId = user.id;
-        console.log('Session set for user:', user.id);
+        await new Promise((resolve, reject) => {
+          req.session.save((err: any) => {
+            if (err) {
+              console.error('Login session save error:', err);
+              reject(err);
+            } else {
+              console.log('Login session saved for user:', user.id);
+              resolve(true);
+            }
+          });
+        });
       } else {
         console.log('No session available');
       }
