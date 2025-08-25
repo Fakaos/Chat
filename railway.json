@@ -4,7 +4,7 @@
     "builder": "NIXPACKS"
   },
   "deploy": {
-    "startCommand": "npm start",
+    "startCommand": "vite build && esbuild server/prod.ts --platform=node --packages=external --bundle --format=esm --outdir=dist && NODE_ENV=production node dist/prod.js",
     "restartPolicyType": "ON_FAILURE",
     "restartPolicyMaxRetries": 10
   }
