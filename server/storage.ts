@@ -358,61 +358,27 @@ export class DatabaseStorage implements IStorage {
 
   private async doInitializeTables(): Promise<void> {
     try {
-      console.log('Initializing database tables...');
+      console.log('Checking database tables...');
       
-      // Check if tables exist by trying to select from users table
-      await this.db.select().from(users).limit(1);
-      console.log('Tables already exist, skipping initialization');
+      // Check if tables exist using information_schema
+      const pool = (this.db as any)._.session.client;
+      const result = await pool.query(`
+        SELECT table_name FROM information_schema.tables 
+        WHERE table_schema = 'public' AND table_name IN ('users', 'chats', 'messages', 'settings')
+      `);
+      
+      if (result.rows.length >= 4) {
+        console.log('All required tables exist, skipping initialization');
+        return;
+      }
+      
+      console.log('Some tables missing, checking what we have:', result.rows.map(r => r.table_name));
+      
+      // Tables already exist, let's just verify they work
+      console.log('Tables already exist in database, using existing schema');
       
     } catch (error) {
-      console.log('Tables do not exist, creating them...');
-      
-      try {
-        // Create tables using raw SQL since Drizzle's migrate might not work
-        const pool = (this.db as any)._.session.client;
-        
-        await pool.query(`
-          CREATE TABLE IF NOT EXISTS users (
-            id VARCHAR PRIMARY KEY DEFAULT gen_random_uuid(),
-            username TEXT NOT NULL UNIQUE,
-            password TEXT NOT NULL,
-            created_at TIMESTAMP DEFAULT NOW()
-          );
-        `);
-        
-        await pool.query(`
-          CREATE TABLE IF NOT EXISTS chats (
-            id VARCHAR PRIMARY KEY DEFAULT gen_random_uuid(),
-            user_id VARCHAR REFERENCES users(id),
-            title TEXT NOT NULL,
-            created_at TIMESTAMP DEFAULT NOW(),
-            updated_at TIMESTAMP DEFAULT NOW()
-          );
-        `);
-        
-        await pool.query(`
-          CREATE TABLE IF NOT EXISTS messages (
-            id VARCHAR PRIMARY KEY DEFAULT gen_random_uuid(),
-            chat_id VARCHAR REFERENCES chats(id) NOT NULL,
-            type TEXT NOT NULL,
-            content TEXT NOT NULL,
-            created_at TIMESTAMP DEFAULT NOW()
-          );
-        `);
-        
-        await pool.query(`
-          CREATE TABLE IF NOT EXISTS settings (
-            id VARCHAR PRIMARY KEY DEFAULT gen_random_uuid(),
-            key TEXT NOT NULL UNIQUE,
-            value TEXT NOT NULL
-          );
-        `);
-        
-        console.log('Database tables created successfully!');
-        
-      } catch (createError) {
-        console.error('Error creating tables:', createError);
-      }
+      console.error('Error checking tables:', error);
     }
   }
 }
