@@ -372,7 +372,7 @@ export class DatabaseStorage implements IStorage {
         return;
       }
       
-      console.log('Some tables missing, checking what we have:', result.rows.map(r => r.table_name));
+      console.log('Some tables missing, checking what we have:', result.rows.map((r: any) => r.table_name));
       
       // Tables already exist, let's just verify they work
       console.log('Tables already exist in database, using existing schema');
