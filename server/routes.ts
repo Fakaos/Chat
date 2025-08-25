@@ -29,8 +29,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         })
       });
 
+      console.log(`Ngrok response status: ${response.status} ${response.statusText}`);
+      
       if (!response.ok) {
+        const errorText = await response.text();
+        console.log('Ngrok error response:', errorText.substring(0, 200));
         throw new Error(`Ngrok API error: ${response.status} ${response.statusText}`);
+      }
+
+      const contentType = response.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        const text = await response.text();
+        console.log('Non-JSON response from ngrok:', text.substring(0, 200));
+        throw new Error('Ngrok endpoint returned non-JSON response (probably HTML error page)');
       }
 
       const data = await response.json();
