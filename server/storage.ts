@@ -214,6 +214,9 @@ export class DatabaseStorage implements IStorage {
         ssl: databaseUrl.includes('railway') ? { rejectUnauthorized: false } : false
       });
       this.db = pgDrizzle(pool);
+      
+      // Initialize tables for Railway
+      this.initializeTables();
     } else {
       // Use Neon for development (Replit)
       console.log('Using Neon client for development');
@@ -341,6 +344,66 @@ export class DatabaseStorage implements IStorage {
 
   async setNgrokUrl(url: string): Promise<void> {
     await this.upsertSetting('ngrok_url', url);
+  }
+
+  private async initializeTables(): Promise<void> {
+    try {
+      console.log('Initializing database tables...');
+      
+      // Check if tables exist by trying to select from users table
+      await this.db.select().from(users).limit(1);
+      console.log('Tables already exist, skipping initialization');
+      
+    } catch (error) {
+      console.log('Tables do not exist, creating them...');
+      
+      try {
+        // Create tables using raw SQL since Drizzle's migrate might not work
+        const pool = (this.db as any)._.session.client;
+        
+        await pool.query(`
+          CREATE TABLE IF NOT EXISTS users (
+            id VARCHAR PRIMARY KEY DEFAULT gen_random_uuid(),
+            username TEXT NOT NULL UNIQUE,
+            password TEXT NOT NULL,
+            created_at TIMESTAMP DEFAULT NOW()
+          );
+        `);
+        
+        await pool.query(`
+          CREATE TABLE IF NOT EXISTS chats (
+            id VARCHAR PRIMARY KEY DEFAULT gen_random_uuid(),
+            user_id VARCHAR REFERENCES users(id),
+            title TEXT NOT NULL,
+            created_at TIMESTAMP DEFAULT NOW(),
+            updated_at TIMESTAMP DEFAULT NOW()
+          );
+        `);
+        
+        await pool.query(`
+          CREATE TABLE IF NOT EXISTS messages (
+            id VARCHAR PRIMARY KEY DEFAULT gen_random_uuid(),
+            chat_id VARCHAR REFERENCES chats(id) NOT NULL,
+            type TEXT NOT NULL,
+            content TEXT NOT NULL,
+            created_at TIMESTAMP DEFAULT NOW()
+          );
+        `);
+        
+        await pool.query(`
+          CREATE TABLE IF NOT EXISTS settings (
+            id VARCHAR PRIMARY KEY DEFAULT gen_random_uuid(),
+            key TEXT NOT NULL UNIQUE,
+            value TEXT NOT NULL
+          );
+        `);
+        
+        console.log('Database tables created successfully!');
+        
+      } catch (createError) {
+        console.error('Error creating tables:', createError);
+      }
+    }
   }
 }
 
