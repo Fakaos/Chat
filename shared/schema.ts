@@ -61,3 +61,14 @@ export type InsertMessage = z.infer<typeof insertMessageSchema>;
 export type Message = typeof messages.$inferSelect;
 export type InsertSetting = z.infer<typeof insertSettingSchema>;
 export type Setting = typeof settings.$inferSelect;
+
+export interface LogEntry {
+  id: string;
+  timestamp: string;
+  level: 'info' | 'error' | 'warn';
+  message: string;
+  userId?: string;
+  username?: string;
+  action?: string;
+  data?: any;
+}

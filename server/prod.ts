@@ -158,7 +158,7 @@ app.post('/api/auth/register', async (req, res) => {
     }
 
     const user = await appStorage.createUser({ username, password });
-    await appStorage.addLog('info', 'User registered', { username });
+    await appStorage.addLog('info', 'User registered', { username }, user.id, username, 'register');
     
     if (req.session) {
       req.session.userId = user.id;
@@ -181,7 +181,7 @@ app.post('/api/auth/register', async (req, res) => {
     });
   } catch (error) {
     console.error('Registration error:', error);
-    await appStorage.addLog('error', 'Registration failed', { error: error instanceof Error ? error.message : 'Unknown error' });
+    await appStorage.addLog('error', 'Registration failed', { error: error instanceof Error ? error.message : 'Unknown error' }, undefined, req.body.username, 'register');
     res.status(500).json({ error: 'Registration failed' });
   }
 });
@@ -214,7 +214,7 @@ app.post('/api/auth/login', async (req, res) => {
       });
     }
     
-    await appStorage.addLog('info', 'User logged in', { username });
+    await appStorage.addLog('info', 'User logged in', { username }, user.id, username, 'login');
     
     res.json({ 
       success: true, 
@@ -222,7 +222,7 @@ app.post('/api/auth/login', async (req, res) => {
     });
   } catch (error) {
     console.error('Login error:', error);
-    await appStorage.addLog('error', 'Login failed', { error: error instanceof Error ? error.message : 'Unknown error' });
+    await appStorage.addLog('error', 'Login failed', { error: error instanceof Error ? error.message : 'Unknown error' }, undefined, req.body.username, 'login');
     res.status(500).json({ error: 'Login failed' });
   }
 });

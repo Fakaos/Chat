@@ -512,6 +512,11 @@ export default function Home({ currentUser, isGuest, onLogout }: HomeProps) {
                             </span>
                             <span>{new Date(entry.timestamp).toLocaleString('cs-CZ')}</span>
                           </div>
+                          {entry.username && entry.action && (
+                            <div className="text-slate-600 text-xs mb-1">
+                              <span className="font-medium">{entry.username}</span> - {entry.action}
+                            </div>
+                          )}
                           <div className="text-slate-800">{entry.message}</div>
                           {entry.data && (
                             <div className="text-slate-500 text-xs mt-1">

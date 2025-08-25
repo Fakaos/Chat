@@ -1,4 +1,4 @@
-import { type User, type InsertUser, type Setting, type InsertSetting, type Chat, type InsertChat, type Message, type InsertMessage, users, settings, chats, messages } from "@shared/schema";
+import { type User, type InsertUser, type Setting, type InsertSetting, type Chat, type InsertChat, type Message, type InsertMessage, type LogEntry, users, settings, chats, messages } from "@shared/schema";
 import { randomUUID } from "crypto";
 import { neon } from "@neondatabase/serverless";
 import { drizzle } from "drizzle-orm/neon-http";
@@ -10,13 +10,6 @@ import { eq, desc } from "drizzle-orm";
 // modify the interface with any CRUD methods
 // you might need
 
-interface LogEntry {
-  id: string;
-  timestamp: string;
-  level: 'info' | 'error' | 'warn';
-  message: string;
-  data?: any;
-}
 
 export interface IStorage {
   getUser(id: string): Promise<User | undefined>;
@@ -24,7 +17,7 @@ export interface IStorage {
   createUser(user: InsertUser): Promise<User>;
   getSettingByKey(key: string): Promise<Setting | undefined>;
   upsertSetting(key: string, value: string): Promise<Setting>;
-  addLog(level: 'info' | 'error' | 'warn', message: string, data?: any): Promise<void>;
+  addLog(level: 'info' | 'error' | 'warn', message: string, data?: any, userId?: string, username?: string, action?: string): Promise<void>;
   getLogs(limit?: number): Promise<LogEntry[]>;
   getErrors(limit?: number): Promise<LogEntry[]>;
   // Chat methods
@@ -89,12 +82,15 @@ export class MemStorage implements IStorage {
     }
   }
 
-  async addLog(level: 'info' | 'error' | 'warn', message: string, data?: any): Promise<void> {
+  async addLog(level: 'info' | 'error' | 'warn', message: string, data?: any, userId?: string, username?: string, action?: string): Promise<void> {
     const logEntry: LogEntry = {
       id: randomUUID(),
       timestamp: new Date().toISOString(),
       level,
       message,
+      userId,
+      username,
+      action,
       data
     };
     
@@ -112,7 +108,7 @@ export class MemStorage implements IStorage {
 
   async getErrors(limit: number = 50): Promise<LogEntry[]> {
     return this.logs
-      .filter(log => log.level === 'error')
+      .filter(log => log.level === 'error' && !log.message.toLowerCase().includes('invalid credentials') && !log.message.toLowerCase().includes('login failed'))
       .slice(-limit)
       .reverse();
   }
@@ -266,12 +262,15 @@ export class DatabaseStorage implements IStorage {
     }
   }
 
-  async addLog(level: 'info' | 'error' | 'warn', message: string, data?: any): Promise<void> {
+  async addLog(level: 'info' | 'error' | 'warn', message: string, data?: any, userId?: string, username?: string, action?: string): Promise<void> {
     const logEntry: LogEntry = {
       id: randomUUID(),
       timestamp: new Date().toISOString(),
       level,
       message,
+      userId,
+      username,
+      action,
       data
     };
     
@@ -289,7 +288,7 @@ export class DatabaseStorage implements IStorage {
 
   async getErrors(limit: number = 50): Promise<LogEntry[]> {
     return this.logs
-      .filter(log => log.level === 'error')
+      .filter(log => log.level === 'error' && !log.message.toLowerCase().includes('invalid credentials') && !log.message.toLowerCase().includes('login failed'))
       .slice(-limit)
       .reverse();
   }

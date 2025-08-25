@@ -128,11 +128,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       await storage.upsertSetting('ngrok_url', ngrokUrl);
-      await storage.addLog('info', 'Ngrok URL changed', { newUrl: ngrokUrl });
+      const user = req.session?.userId ? await storage.getUser(req.session.userId) : null;
+      await storage.addLog('info', 'Ngrok URL changed', { newUrl: ngrokUrl }, user?.id, user?.username, 'change_ngrok_url');
       res.json({ success: true, ngrokUrl });
     } catch (error) {
       console.error('Error saving ngrok URL:', error);
-      await storage.addLog('error', 'Failed to save ngrok URL', { error: error instanceof Error ? error.message : 'Unknown error' });
+      const user = req.session?.userId ? await storage.getUser(req.session.userId) : null;
+      await storage.addLog('error', 'Failed to save ngrok URL', { error: error instanceof Error ? error.message : 'Unknown error' }, user?.id, user?.username, 'change_ngrok_url');
       res.status(500).json({ error: 'Failed to save ngrok URL' });
     }
   });
@@ -186,7 +188,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Create user (in real app, hash password)
       const user = await storage.createUser({ username, password });
-      await storage.addLog('info', 'User registered', { username });
+      await storage.addLog('info', 'User registered', { username }, user.id, username, 'register');
       
       // Set session with explicit save
       if (req.session) {
@@ -212,7 +214,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     } catch (error) {
       console.error('Registration error:', error);
-      await storage.addLog('error', 'Registration failed', { error: error instanceof Error ? error.message : 'Unknown error' });
+      await storage.addLog('error', 'Registration failed', { error: error instanceof Error ? error.message : 'Unknown error' }, undefined, req.body.username, 'register');
       res.status(500).json({ error: 'Registration failed' });
     }
   });
@@ -252,7 +254,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.log('No session available');
       }
       
-      await storage.addLog('info', 'User logged in', { username });
+      await storage.addLog('info', 'User logged in', { username }, user.id, username, 'login');
       
       res.json({ 
         success: true, 
@@ -260,7 +262,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     } catch (error) {
       console.error('Login error:', error);
-      await storage.addLog('error', 'Login failed', { error: error instanceof Error ? error.message : 'Unknown error' });
+      await storage.addLog('error', 'Login failed', { error: error instanceof Error ? error.message : 'Unknown error' }, undefined, req.body.username, 'login');
       res.status(500).json({ error: 'Login failed' });
     }
   });
@@ -327,10 +329,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const chats = await storage.getUserChats(userId);
+      const user = await storage.getUser(userId);
+      await storage.addLog('info', 'User fetched chats', { chatCount: chats.length }, userId, user?.username, 'fetch_chats');
       console.log(`Found ${chats.length} chats for user ${userId}`);
       res.json({ chats });
     } catch (error) {
       console.error('Error fetching chats:', error);
+      const user = req.session?.userId ? await storage.getUser(req.session.userId) : null;
+      await storage.addLog('error', 'Failed to fetch chats', { error: error instanceof Error ? error.message : 'Unknown error' }, user?.id, user?.username, 'fetch_chats');
       res.status(500).json({ error: 'Failed to fetch chats' });
     }
   });
@@ -353,10 +359,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const chat = await storage.createChat({ userId, title });
+      const user = await storage.getUser(userId);
+      await storage.addLog('info', 'User created chat', { chatId: chat.id, title }, userId, user?.username, 'create_chat');
       console.log('Chat created successfully:', chat.id);
       res.json({ chat });
     } catch (error) {
       console.error('Error creating chat:', error);
+      const user = req.session?.userId ? await storage.getUser(req.session.userId) : null;
+      await storage.addLog('error', 'Failed to create chat', { error: error instanceof Error ? error.message : 'Unknown error', title: req.body.title }, user?.id, user?.username, 'create_chat');
       res.status(500).json({ error: 'Failed to create chat' });
     }
   });
@@ -371,9 +381,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const messages = await storage.getChatMessages(chatId);
+      const user = await storage.getUser(userId);
+      await storage.addLog('info', 'User fetched messages', { chatId, messageCount: messages.length }, userId, user?.username, 'fetch_messages');
       res.json({ messages });
     } catch (error) {
       console.error('Error fetching messages:', error);
+      const user = req.session?.userId ? await storage.getUser(req.session.userId) : null;
+      await storage.addLog('error', 'Failed to fetch messages', { error: error instanceof Error ? error.message : 'Unknown error', chatId: req.params.chatId }, user?.id, user?.username, 'fetch_messages');
       res.status(500).json({ error: 'Failed to fetch messages' });
     }
   });
@@ -389,9 +403,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const message = await storage.createMessage({ chatId, type, content });
+      const user = await storage.getUser(userId);
+      await storage.addLog('info', 'User created message', { chatId, messageId: message.id, type, contentLength: content?.length || 0 }, userId, user?.username, 'create_message');
       res.json({ message });
     } catch (error) {
       console.error('Error creating message:', error);
+      const user = req.session?.userId ? await storage.getUser(req.session.userId) : null;
+      await storage.addLog('error', 'Failed to create message', { error: error instanceof Error ? error.message : 'Unknown error', chatId: req.params.chatId, type: req.body.type }, user?.id, user?.username, 'create_message');
       res.status(500).json({ error: 'Failed to create message' });
     }
   });
@@ -410,10 +428,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!chat) {
         return res.status(404).json({ error: 'Chat not found' });
       }
-
+      
+      const user = await storage.getUser(userId);
+      await storage.addLog('info', 'User updated chat', { chatId, newTitle: title }, userId, user?.username, 'update_chat');
       res.json({ chat });
     } catch (error) {
       console.error('Error updating chat:', error);
+      const user = req.session?.userId ? await storage.getUser(req.session.userId) : null;
+      await storage.addLog('error', 'Failed to update chat', { error: error instanceof Error ? error.message : 'Unknown error', chatId: req.params.chatId, title: req.body.title }, user?.id, user?.username, 'update_chat');
       res.status(500).json({ error: 'Failed to update chat' });
     }
   });
@@ -428,9 +450,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const deleted = await storage.deleteChat(chatId);
+      const user = await storage.getUser(userId);
+      await storage.addLog('info', 'User deleted chat', { chatId, success: deleted }, userId, user?.username, 'delete_chat');
       res.json({ success: deleted });
     } catch (error) {
       console.error('Error deleting chat:', error);
+      const user = req.session?.userId ? await storage.getUser(req.session.userId) : null;
+      await storage.addLog('error', 'Failed to delete chat', { error: error instanceof Error ? error.message : 'Unknown error', chatId: req.params.chatId }, user?.id, user?.username, 'delete_chat');
       res.status(500).json({ error: 'Failed to delete chat' });
     }
   });
