@@ -24,24 +24,35 @@ export default function Home() {
 
   const chatMutation = useMutation({
     mutationFn: async (prompt: string): Promise<LlamaResponse> => {
-      const response = await fetch('https://0c8125184293.ngrok-free.app/api/generate', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'ngrok-skip-browser-warning': 'true',
-        },
-        body: JSON.stringify({
-          model: "llama2:7b",
-          prompt: prompt,
-          stream: false
-        })
-      });
+      try {
+        const response = await fetch('https://0c8125184293.ngrok-free.app/api/generate', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'ngrok-skip-browser-warning': 'true',
+            'User-Agent': 'Mozilla/5.0 (compatible; ChatApp/1.0)',
+          },
+          body: JSON.stringify({
+            model: "llama2:7b",
+            prompt: prompt,
+            stream: false
+          }),
+          mode: 'cors',
+        });
 
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        const data = await response.json();
+        return data;
+      } catch (error) {
+        console.error('API connection error:', error);
+        // Simulujeme odpověď pro testování rozhraní
+        return {
+          response: `Echo: ${prompt} (Poznámka: API endpoint není momentálně dostupný, toto je simulovaná odpověď pro testování rozhraní)`
+        };
       }
-
-      return response.json();
     },
     onSuccess: (data, prompt) => {
       const userMessage: ChatMessage = {
