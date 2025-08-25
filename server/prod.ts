@@ -4,7 +4,17 @@ import connectPgSimple from "connect-pg-simple";
 import { neon } from "@neondatabase/serverless";
 import path from "path";
 import { fileURLToPath } from 'url';
-import { storage } from "./storage";
+import { storage, MemStorage, IStorage } from "./storage";
+
+// Use fallback storage if database is not available
+let appStorage: IStorage;
+if (process.env.DATABASE_URL) {
+  appStorage = storage; // DatabaseStorage
+  console.log('Using PostgreSQL database storage');
+} else {
+  appStorage = new MemStorage();
+  console.log('DATABASE_URL not found, using in-memory storage');
+}
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -13,15 +23,8 @@ const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
-// PostgreSQL session store
-const PgSession = connectPgSimple(session);
-
-// Session configuration
-app.use(session({
-  store: new PgSession({
-    conString: process.env.DATABASE_URL,
-    createTableIfMissing: true,
-  }),
+// Session configuration with fallback
+let sessionConfig: any = {
   secret: process.env.SESSION_SECRET || 'chat-app-secret-key-change-in-production',
   resave: false,
   saveUninitialized: false,
@@ -31,7 +34,21 @@ app.use(session({
     maxAge: 24 * 60 * 60 * 1000,
     sameSite: process.env.NODE_ENV === 'production' ? 'strict' : 'lax'
   }
-}));
+};
+
+// Use PostgreSQL session store if DATABASE_URL is available
+if (process.env.DATABASE_URL) {
+  const PgSession = connectPgSimple(session);
+  sessionConfig.store = new PgSession({
+    conString: process.env.DATABASE_URL,
+    createTableIfMissing: true,
+  });
+  console.log('Using PostgreSQL session store');
+} else {
+  console.log('DATABASE_URL not found, using default MemoryStore for sessions');
+}
+
+app.use(session(sessionConfig));
 
 // Extend Express Request type to include session
 declare module 'express-serve-static-core' {
@@ -64,7 +81,7 @@ app.get('/api/test', (req, res) => {
 // Ngrok URL management
 app.get('/api/settings/ngrok-url', async (req, res) => {
   try {
-    const ngrokUrl = await storage.getNgrokUrl();
+    const ngrokUrl = await appStorage.getNgrokUrl();
     res.json({ ngrokUrl });
   } catch (error) {
     console.error('Error fetching ngrok URL:', error);
@@ -80,7 +97,7 @@ app.post('/api/settings/ngrok-url', async (req, res) => {
       return res.status(400).json({ error: 'ngrokUrl is required' });
     }
 
-    await storage.setNgrokUrl(ngrokUrl);
+    await appStorage.setNgrokUrl(ngrokUrl);
     res.json({ ngrokUrl });
   } catch (error) {
     console.error('Error saving ngrok URL:', error);
@@ -92,7 +109,7 @@ app.post('/api/settings/ngrok-url', async (req, res) => {
 app.get('/api/logs', async (req, res) => {
   try {
     const limit = parseInt(req.query.limit as string) || 50;
-    const logs = await storage.getLogs(limit);
+    const logs = await appStorage.getLogs(limit);
     res.json({ logs });
   } catch (error) {
     console.error('Error fetching logs:', error);
@@ -103,7 +120,7 @@ app.get('/api/logs', async (req, res) => {
 app.get('/api/errors', async (req, res) => {
   try {
     const limit = parseInt(req.query.limit as string) || 50;
-    const errors = await storage.getErrors(limit);
+    const errors = await appStorage.getErrors(limit);
     res.json({ errors });
   } catch (error) {
     console.error('Error fetching errors:', error);
@@ -120,13 +137,13 @@ app.post('/api/auth/register', async (req, res) => {
       return res.status(400).json({ error: 'Username and password required' });
     }
 
-    const existingUser = await storage.getUserByUsername(username);
+    const existingUser = await appStorage.getUserByUsername(username);
     if (existingUser) {
       return res.status(400).json({ error: 'Username already exists' });
     }
 
-    const user = await storage.createUser({ username, password });
-    await storage.addLog('info', 'User registered', { username });
+    const user = await appStorage.createUser({ username, password });
+    await appStorage.addLog('info', 'User registered', { username });
     
     if (req.session) {
       req.session.userId = user.id;
@@ -138,7 +155,7 @@ app.post('/api/auth/register', async (req, res) => {
     });
   } catch (error) {
     console.error('Registration error:', error);
-    await storage.addLog('error', 'Registration failed', { error: error instanceof Error ? error.message : 'Unknown error' });
+    await appStorage.addLog('error', 'Registration failed', { error: error instanceof Error ? error.message : 'Unknown error' });
     res.status(500).json({ error: 'Registration failed' });
   }
 });
@@ -151,7 +168,7 @@ app.post('/api/auth/login', async (req, res) => {
       return res.status(400).json({ error: 'Username and password required' });
     }
 
-    const user = await storage.getUserByUsername(username);
+    const user = await appStorage.getUserByUsername(username);
     if (!user || user.password !== password) {
       return res.status(401).json({ error: 'Invalid credentials' });
     }
@@ -160,7 +177,7 @@ app.post('/api/auth/login', async (req, res) => {
       req.session.userId = user.id;
     }
     
-    await storage.addLog('info', 'User logged in', { username });
+    await appStorage.addLog('info', 'User logged in', { username });
     
     res.json({ 
       success: true, 
@@ -168,7 +185,7 @@ app.post('/api/auth/login', async (req, res) => {
     });
   } catch (error) {
     console.error('Login error:', error);
-    await storage.addLog('error', 'Login failed', { error: error instanceof Error ? error.message : 'Unknown error' });
+    await appStorage.addLog('error', 'Login failed', { error: error instanceof Error ? error.message : 'Unknown error' });
     res.status(500).json({ error: 'Login failed' });
   }
 });
@@ -188,7 +205,7 @@ app.get('/api/auth/me', async (req, res) => {
       return res.status(401).json({ error: 'Not authenticated' });
     }
 
-    const user = await storage.getUser(req.session.userId);
+    const user = await appStorage.getUser(req.session.userId);
     if (!user) {
       return res.status(401).json({ error: 'User not found' });
     }
@@ -210,7 +227,7 @@ app.get('/api/chats', async (req, res) => {
       return res.status(401).json({ error: 'Not authenticated' });
     }
 
-    const chats = await storage.getUserChats(userId);
+    const chats = await appStorage.getUserChats(userId);
     res.json({ chats });
   } catch (error) {
     console.error('Error fetching chats:', error);
@@ -227,7 +244,7 @@ app.post('/api/chats', async (req, res) => {
       return res.status(401).json({ error: 'Not authenticated' });
     }
 
-    const chat = await storage.createChat({ userId, title });
+    const chat = await appStorage.createChat({ userId, title });
     res.json({ chat });
   } catch (error) {
     console.error('Error creating chat:', error);
@@ -244,7 +261,7 @@ app.get('/api/chats/:chatId/messages', async (req, res) => {
       return res.status(401).json({ error: 'Not authenticated' });
     }
 
-    const messages = await storage.getChatMessages(chatId);
+    const messages = await appStorage.getChatMessages(chatId);
     res.json({ messages });
   } catch (error) {
     console.error('Error fetching messages:', error);
@@ -262,7 +279,7 @@ app.post('/api/chats/:chatId/messages', async (req, res) => {
       return res.status(401).json({ error: 'Not authenticated' });
     }
 
-    const message = await storage.createMessage({ chatId, type, content });
+    const message = await appStorage.createMessage({ chatId, type, content });
     res.json({ message });
   } catch (error) {
     console.error('Error creating message:', error);
@@ -280,7 +297,7 @@ app.put('/api/chats/:chatId', async (req, res) => {
       return res.status(401).json({ error: 'Not authenticated' });
     }
 
-    const chat = await storage.updateChat(chatId, title);
+    const chat = await appStorage.updateChat(chatId, title);
     if (!chat) {
       return res.status(404).json({ error: 'Chat not found' });
     }
@@ -301,7 +318,7 @@ app.delete('/api/chats/:chatId', async (req, res) => {
       return res.status(401).json({ error: 'Not authenticated' });
     }
 
-    const deleted = await storage.deleteChat(chatId);
+    const deleted = await appStorage.deleteChat(chatId);
     res.json({ success: deleted });
   } catch (error) {
     console.error('Error deleting chat:', error);
