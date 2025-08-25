@@ -24,6 +24,9 @@ export default function Home() {
 
   const chatMutation = useMutation({
     mutationFn: async (prompt: string): Promise<LlamaResponse> => {
+      // Připrav posledních 10 zpráv jako kontext
+      const recentMessages = messages.slice(-10);
+      
       const response = await fetch('/api/generate', {
         method: 'POST',
         headers: {
@@ -32,7 +35,8 @@ export default function Home() {
         body: JSON.stringify({
           model: "llama2:7b",
           prompt: prompt,
-          stream: false
+          stream: false,
+          history: recentMessages
         })
       });
 

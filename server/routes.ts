@@ -9,10 +9,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Proxy endpoint for ngrok communication
   app.post('/api/generate', async (req, res) => {
     try {
-      const { prompt, model, stream } = req.body;
+      const { prompt, model, stream, history } = req.body;
       
       if (!prompt) {
         return res.status(400).json({ error: 'Prompt is required' });
+      }
+
+      // Sestavit kontext z historie
+      let contextualPrompt = prompt;
+      if (history && history.length > 0) {
+        const contextMessages = history.map((msg: any) => {
+          const role = msg.type === 'user' ? 'Uživatel' : 'AI';
+          return `${role}: ${msg.content}`;
+        }).join('\n');
+        
+        contextualPrompt = `Kontext předchozí konverzace:\n${contextMessages}\n\nNová zpráva uživatele: ${prompt}`;
       }
 
       // Forward request to ngrok endpoint
@@ -24,7 +35,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         },
         body: JSON.stringify({
           model: model || "llama2:7b",
-          prompt: prompt,
+          prompt: contextualPrompt,
           stream: stream || false
         })
       });
