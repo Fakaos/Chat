@@ -5,6 +5,15 @@ import { storage } from "./storage";
 export async function registerRoutes(app: Express): Promise<Server> {
   // put application routes here
   // prefix all routes with /api
+  
+  // Simple test endpoint
+  app.get('/api/test', (req, res) => {
+    res.json({ 
+      message: 'Backend is working!', 
+      timestamp: new Date().toISOString(),
+      env: process.env.NODE_ENV 
+    });
+  });
 
   // Proxy endpoint for ngrok communication
   app.post('/api/generate', async (req, res) => {
