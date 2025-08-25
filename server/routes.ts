@@ -18,35 +18,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Proxy endpoint for ngrok communication
   app.post('/api/generate', async (req, res) => {
     try {
-      const { prompt, model, stream, history } = req.body;
+      const { prompt, model, stream, ngrokUrl } = req.body;
       
       if (!prompt) {
         return res.status(400).json({ error: 'Prompt is required' });
       }
 
-      // Sestavit kontext z historie
-      let contextualPrompt = prompt;
-      if (history && history.length > 0) {
-        const contextMessages = history.map((msg: any) => {
-          const role = msg.type === 'user' ? 'Uživatel' : 'AI';
-          return `${role}: ${msg.content}`;
-        }).join('\n');
-        
-        contextualPrompt = `${contextMessages}
-Uživatel: ${prompt}
-AI:`;
-      }
-
       const requestBody = {
         model: model || "llama2:7b",
-        prompt: contextualPrompt,
+        prompt: prompt,
         stream: stream || false
       };
 
+      const targetUrl = ngrokUrl || 'https://0c8125184293.ngrok-free.app';
+      const fullUrl = `${targetUrl}/api/generate`;
+
       console.log('JSON posílaný na ngrok:', JSON.stringify(requestBody, null, 2));
+      console.log('Target URL:', fullUrl);
 
       // Forward request to ngrok endpoint
-      const response = await fetch('https://0c8125184293.ngrok-free.app/api/generate', {
+      const response = await fetch(fullUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

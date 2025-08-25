@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 
 interface ChatMessage {
   id: string;
@@ -20,13 +21,15 @@ interface LlamaResponse {
 export default function Home() {
   const [message, setMessage] = useState("");
   const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [showAdminPanel, setShowAdminPanel] = useState(false);
+  const [adminPassword, setAdminPassword] = useState("");
+  const [isAdminAuthenticated, setIsAdminAuthenticated] = useState(false);
+  const [ngrokUrl, setNgrokUrl] = useState("https://0c8125184293.ngrok-free.app");
+  const [tempNgrokUrl, setTempNgrokUrl] = useState("");
   const { toast } = useToast();
 
   const chatMutation = useMutation({
     mutationFn: async (prompt: string): Promise<LlamaResponse> => {
-      // Připrav posledních 10 zpráv jako kontext
-      const recentMessages = messages.slice(-10);
-      
       const response = await fetch('/api/generate', {
         method: 'POST',
         headers: {
@@ -36,7 +39,7 @@ export default function Home() {
           model: "llama2:7b",
           prompt: prompt,
           stream: false,
-          history: recentMessages
+          ngrokUrl: ngrokUrl
         })
       });
 
@@ -106,8 +109,119 @@ export default function Home() {
     }
   };
 
+  const handleAdminLogin = () => {
+    if (adminPassword === '270602') {
+      setIsAdminAuthenticated(true);
+      setTempNgrokUrl(ngrokUrl);
+      toast({
+        title: "Přihlášení úspěšné",
+        description: "Vítejte v admin panelu!",
+      });
+    } else {
+      toast({
+        title: "Chybné heslo",
+        description: "Prosím zadejte správné heslo.",
+        variant: "destructive"
+      });
+    }
+    setAdminPassword("");
+  };
+
+  const handleSaveNgrokUrl = () => {
+    if (tempNgrokUrl.trim()) {
+      setNgrokUrl(tempNgrokUrl.trim());
+      setShowAdminPanel(false);
+      toast({
+        title: "URL aktualizována",
+        description: "Nová ngrok URL byla uložena.",
+      });
+    }
+  };
+
+  const handleAdminLogout = () => {
+    setIsAdminAuthenticated(false);
+    setShowAdminPanel(false);
+    setTempNgrokUrl("");
+  };
+
   return (
     <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
+      {/* Admin Button */}
+      <div className="fixed top-4 right-4 z-10">
+        <Dialog open={showAdminPanel} onOpenChange={setShowAdminPanel}>
+          <DialogTrigger asChild>
+            <Button
+              variant="outline" 
+              size="sm"
+              className="bg-white hover:bg-slate-50 border-slate-300"
+              data-testid="button-admin"
+            >
+              <i className="fas fa-cog mr-2 text-sm"></i>
+              Admin
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="sm:max-w-md" data-testid="admin-panel">
+            <DialogHeader>
+              <DialogTitle>Admin Panel</DialogTitle>
+            </DialogHeader>
+            
+            {!isAdminAuthenticated ? (
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <label htmlFor="admin-password" className="text-sm font-medium">
+                    Heslo:
+                  </label>
+                  <Input
+                    id="admin-password"
+                    type="password"
+                    value={adminPassword}
+                    onChange={(e) => setAdminPassword(e.target.value)}
+                    onKeyPress={(e) => e.key === 'Enter' && handleAdminLogin()}
+                    placeholder="Zadejte admin heslo"
+                    data-testid="input-admin-password"
+                  />
+                </div>
+                <div className="flex space-x-2">
+                  <Button onClick={handleAdminLogin} className="flex-1" data-testid="button-admin-login">
+                    Přihlásit
+                  </Button>
+                  <Button variant="outline" onClick={() => setShowAdminPanel(false)} className="flex-1">
+                    Zrušit
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <label htmlFor="ngrok-url" className="text-sm font-medium">
+                    Ngrok URL:
+                  </label>
+                  <Input
+                    id="ngrok-url"
+                    type="url"
+                    value={tempNgrokUrl}
+                    onChange={(e) => setTempNgrokUrl(e.target.value)}
+                    placeholder="https://xxxxx.ngrok-free.app"
+                    data-testid="input-ngrok-url"
+                  />
+                  <p className="text-xs text-slate-500">
+                    Aktuální: {ngrokUrl}
+                  </p>
+                </div>
+                <div className="flex space-x-2">
+                  <Button onClick={handleSaveNgrokUrl} className="flex-1" data-testid="button-save-url">
+                    Uložit URL
+                  </Button>
+                  <Button variant="outline" onClick={handleAdminLogout} className="flex-1">
+                    Odhlásit
+                  </Button>
+                </div>
+              </div>
+            )}
+          </DialogContent>
+        </Dialog>
+      </div>
+
       <div className="w-full max-w-2xl">
         {/* Header */}
         <div className="text-center mb-8">
