@@ -211,7 +211,8 @@ export default function Home({ currentUser, isGuest, onLogout }: HomeProps) {
   const handleAdminLogin = () => {
     if (adminPassword === '270602') {
       setIsAdminAuthenticated(true);
-      setTempNgrokUrl(ngrokUrl);
+      // Nastavit tempNgrokUrl na aktuální ngrokUrl při přihlášení
+      setTempNgrokUrl(ngrokUrl || "https://0c8125184293.ngrok-free.app");
       toast({
         title: "Přihlášení úspěšné",
         description: "Vítejte v admin panelu!",
