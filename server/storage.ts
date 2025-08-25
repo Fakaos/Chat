@@ -1,5 +1,8 @@
-import { type User, type InsertUser, type Setting, type InsertSetting, type Chat, type InsertChat, type Message, type InsertMessage } from "@shared/schema";
+import { type User, type InsertUser, type Setting, type InsertSetting, type Chat, type InsertChat, type Message, type InsertMessage, users, settings, chats, messages } from "@shared/schema";
 import { randomUUID } from "crypto";
+import { neon } from "@neondatabase/serverless";
+import { drizzle } from "drizzle-orm/neon-http";
+import { eq, desc } from "drizzle-orm";
 
 // modify the interface with any CRUD methods
 // you might need
@@ -190,4 +193,137 @@ export class MemStorage implements IStorage {
   }
 }
 
-export const storage = new MemStorage();
+// Database storage implementation
+export class DatabaseStorage implements IStorage {
+  private db;
+  private logs: LogEntry[] = []; // Keep logs in memory for now
+
+  constructor() {
+    const sql = neon(process.env.DATABASE_URL!);
+    this.db = drizzle(sql);
+  }
+
+  async getUser(id: string): Promise<User | undefined> {
+    const result = await this.db.select().from(users).where(eq(users.id, id)).limit(1);
+    return result[0];
+  }
+
+  async getUserByUsername(username: string): Promise<User | undefined> {
+    const result = await this.db.select().from(users).where(eq(users.username, username)).limit(1);
+    return result[0];
+  }
+
+  async createUser(insertUser: InsertUser): Promise<User> {
+    const result = await this.db.insert(users).values(insertUser).returning();
+    return result[0];
+  }
+
+  async getSettingByKey(key: string): Promise<Setting | undefined> {
+    const result = await this.db.select().from(settings).where(eq(settings.key, key)).limit(1);
+    return result[0];
+  }
+
+  async upsertSetting(key: string, value: string): Promise<Setting> {
+    const existing = await this.getSettingByKey(key);
+    if (existing) {
+      const result = await this.db.update(settings)
+        .set({ value })
+        .where(eq(settings.key, key))
+        .returning();
+      return result[0];
+    } else {
+      const result = await this.db.insert(settings)
+        .values({ key, value })
+        .returning();
+      return result[0];
+    }
+  }
+
+  async addLog(level: 'info' | 'error' | 'warn', message: string, data?: any): Promise<void> {
+    const logEntry: LogEntry = {
+      id: randomUUID(),
+      timestamp: new Date().toISOString(),
+      level,
+      message,
+      data
+    };
+    
+    this.logs.push(logEntry);
+    
+    // Omezit na posledních 1000 logů
+    if (this.logs.length > 1000) {
+      this.logs = this.logs.slice(-1000);
+    }
+  }
+
+  async getLogs(limit: number = 50): Promise<LogEntry[]> {
+    return this.logs.slice(-limit).reverse();
+  }
+
+  async getErrors(limit: number = 50): Promise<LogEntry[]> {
+    return this.logs
+      .filter(log => log.level === 'error')
+      .slice(-limit)
+      .reverse();
+  }
+
+  async getUserChats(userId: string): Promise<Chat[]> {
+    const result = await this.db.select()
+      .from(chats)
+      .where(eq(chats.userId, userId))
+      .orderBy(desc(chats.updatedAt));
+    return result;
+  }
+
+  async createChat(insertChat: InsertChat): Promise<Chat> {
+    const result = await this.db.insert(chats).values(insertChat).returning();
+    return result[0];
+  }
+
+  async updateChat(chatId: string, title: string): Promise<Chat | undefined> {
+    const result = await this.db.update(chats)
+      .set({ title, updatedAt: new Date() })
+      .where(eq(chats.id, chatId))
+      .returning();
+    return result[0];
+  }
+
+  async deleteChat(chatId: string): Promise<boolean> {
+    // Smaž nejdřív zprávy
+    await this.db.delete(messages).where(eq(messages.chatId, chatId));
+    // Pak smaž chat
+    const result = await this.db.delete(chats).where(eq(chats.id, chatId));
+    return true;
+  }
+
+  async getChatMessages(chatId: string): Promise<Message[]> {
+    const result = await this.db.select()
+      .from(messages)
+      .where(eq(messages.chatId, chatId))
+      .orderBy(messages.createdAt);
+    return result;
+  }
+
+  async createMessage(insertMessage: InsertMessage): Promise<Message> {
+    const result = await this.db.insert(messages).values(insertMessage).returning();
+    
+    // Update chat's updatedAt timestamp
+    await this.db.update(chats)
+      .set({ updatedAt: new Date() })
+      .where(eq(chats.id, insertMessage.chatId));
+    
+    return result[0];
+  }
+
+  async getNgrokUrl(): Promise<string | undefined> {
+    const setting = await this.getSettingByKey('ngrok_url');
+    return setting?.value;
+  }
+
+  async setNgrokUrl(url: string): Promise<void> {
+    await this.upsertSetting('ngrok_url', url);
+  }
+}
+
+// Use database storage instead of memory storage
+export const storage = new DatabaseStorage();
