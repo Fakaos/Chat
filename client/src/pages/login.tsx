@@ -26,6 +26,7 @@ export default function Login({ onLoginSuccess, onContinueAsGuest }: LoginProps)
           headers: {
             'Content-Type': 'application/json',
           },
+          credentials: 'include',
           body: JSON.stringify({ username, password })
         });
 

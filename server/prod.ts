@@ -25,20 +25,26 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
+
+// Trust proxy for Railway
+app.set('trust proxy', 1);
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
-// Session configuration with fallback
+// Session configuration for Railway production
 let sessionConfig: any = {
-  secret: process.env.SESSION_SECRET || 'chat-app-secret-key-change-in-production',
+  secret: process.env.SESSION_SECRET || 'railway-chat-app-secret-2025',
   resave: false,
-  saveUninitialized: false,
+  saveUninitialized: true,
   cookie: {
-    secure: process.env.NODE_ENV === 'production',
+    secure: false, // Railway uses reverse proxy, keep false
     httpOnly: true,
-    maxAge: 24 * 60 * 60 * 1000,
-    sameSite: process.env.NODE_ENV === 'production' ? 'strict' : 'lax'
-  }
+    maxAge: 24 * 60 * 60 * 1000, // 24 hours
+    sameSite: 'lax',
+    path: '/'
+  },
+  name: 'sessionId'
 };
 
 // Use PostgreSQL session store if DATABASE_URL is available
@@ -64,9 +70,13 @@ declare module 'express-serve-static-core' {
 
 // CORS headers for Railway
 app.use('/api', (req, res, next) => {
-  res.header('Access-Control-Allow-Origin', '*');
+  const origin = req.headers.origin;
+  if (origin) {
+    res.header('Access-Control-Allow-Origin', origin);
+  }
   res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
+  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization, Cookie');
+  res.header('Access-Control-Allow-Credentials', 'true');
   
   if (req.method === 'OPTIONS') {
     return res.sendStatus(200);
@@ -152,6 +162,17 @@ app.post('/api/auth/register', async (req, res) => {
     
     if (req.session) {
       req.session.userId = user.id;
+      await new Promise((resolve, reject) => {
+        req.session.save((err: any) => {
+          if (err) {
+            console.error('Registration session save error:', err);
+            reject(err);
+          } else {
+            console.log('Registration session saved for user:', user.id);
+            resolve(true);
+          }
+        });
+      });
     }
     
     res.json({ 
@@ -180,6 +201,17 @@ app.post('/api/auth/login', async (req, res) => {
 
     if (req.session) {
       req.session.userId = user.id;
+      await new Promise((resolve, reject) => {
+        req.session.save((err: any) => {
+          if (err) {
+            console.error('Login session save error:', err);
+            reject(err);
+          } else {
+            console.log('Login session saved for user:', user.id);
+            resolve(true);
+          }
+        });
+      });
     }
     
     await appStorage.addLog('info', 'User logged in', { username });

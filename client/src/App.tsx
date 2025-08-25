@@ -22,7 +22,9 @@ function App() {
   useEffect(() => {
     const checkAuth = async () => {
       try {
-        const response = await fetch('/api/auth/me');
+        const response = await fetch('/api/auth/me', {
+          credentials: 'include'
+        });
         if (response.ok) {
           const data = await response.json();
           setCurrentUser(data.user);
@@ -50,7 +52,8 @@ function App() {
   const handleLogout = async () => {
     try {
       await fetch('/api/auth/logout', {
-        method: 'POST'
+        method: 'POST',
+        credentials: 'include'
       });
     } catch (error) {
       console.error('Logout failed:', error);
