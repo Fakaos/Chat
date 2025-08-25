@@ -46,6 +46,10 @@ export default function ChatSidebar({
       });
       
       if (!response.ok) {
+        if (response.status === 401) {
+          console.log('User not authenticated, will need to re-login');
+          throw new Error('Not authenticated');
+        }
         const errorText = await response.text();
         console.error('Failed to fetch chats:', response.status, errorText);
         throw new Error(`Failed to fetch chats: ${response.status}`);
@@ -56,8 +60,15 @@ export default function ChatSidebar({
       return data;
     },
     enabled: !!currentUser?.id, // Only fetch when user is logged in
-    refetchInterval: 10000, // Refresh every 10 seconds
-    retry: 3
+    refetchInterval: 30000, // Refresh every 30 seconds (less frequent)
+    retry: (failureCount, error) => {
+      // Don't retry auth errors
+      if (error.message.includes('Not authenticated')) {
+        return false;
+      }
+      return failureCount < 2; // Retry max 2 times for other errors
+    },
+    retryDelay: 2000 // Wait 2 seconds between retries
   });
 
   const chats: Chat[] = chatsData?.chats || [];
@@ -244,7 +255,18 @@ export default function ChatSidebar({
           </div>
         ) : error ? (
           <div className="p-4 text-center text-red-500 text-sm">
-            Chyba při načítání chatů
+            {error.message.includes('Not authenticated') 
+              ? 'Přihlaste se znovu' 
+              : 'Chyba při načítání chatů'}
+            <br />
+            <Button 
+              variant="outline" 
+              size="sm" 
+              className="mt-2"
+              onClick={() => window.location.reload()}
+            >
+              Obnovit
+            </Button>
           </div>
         ) : chats.length === 0 ? (
           <div className="p-4 text-center text-slate-500 text-sm">

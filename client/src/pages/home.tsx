@@ -143,15 +143,43 @@ export default function Home({ currentUser, isGuest, onLogout }: HomeProps) {
 
     if (chatMutation.isPending) return;
 
-    // Pokud není aktuální chat a uživatel není guest, použij warning
+    // Pokud není aktuální chat a uživatel není guest, vytvoř automaticky nový chat
     let chatId = currentChatId;
     if (!isGuest && !chatId && currentUser) {
-      toast({
-        title: "Vytvořte nový chat",
-        description: "Prosím klikněte na 'Nový chat' v postranním panelu.",
-        variant: "destructive"
-      });
-      return;
+      try {
+        const response = await fetch('/api/chats', {
+          method: 'POST',
+          credentials: 'include',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ title: `Chat ${new Date().toLocaleString('cs-CZ').slice(0, 16)}` })
+        });
+        
+        if (response.ok) {
+          const data = await response.json();
+          chatId = data.chat.id;
+          setCurrentChatId(chatId);
+          queryClient.invalidateQueries({ queryKey: ['user-chats'] });
+          console.log('Auto-created chat:', data.chat.id);
+        } else {
+          console.error('Failed to auto-create chat:', response.status);
+          toast({
+            title: "Chyba",
+            description: "Nepodařilo se vytvořit chat. Zkuste se znovu přihlásit.",
+            variant: "destructive"
+          });
+          return;
+        }
+      } catch (error) {
+        console.error('Error auto-creating chat:', error);
+        toast({
+          title: "Chyba připojení",
+          description: "Nepodařilo se připojit k serveru.",
+          variant: "destructive"
+        });
+        return;
+      }
     }
 
     // Přidej user zprávu ihned

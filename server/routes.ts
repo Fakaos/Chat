@@ -10,12 +10,13 @@ declare module 'express-serve-static-core' {
 }
 
 export async function registerRoutes(app: Express): Promise<Server> {
-  // Error handling middleware
+  // CORS and error handling middleware
   app.use('/api', (req, res, next) => {
     // Add CORS headers for Railway
-    res.header('Access-Control-Allow-Origin', '*');
+    res.header('Access-Control-Allow-Origin', req.headers.origin || '*');
     res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-    res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
+    res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization, Cookie');
+    res.header('Access-Control-Allow-Credentials', 'true');
     
     if (req.method === 'OPTIONS') {
       return res.sendStatus(200);

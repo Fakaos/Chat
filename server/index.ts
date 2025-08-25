@@ -6,20 +6,25 @@ import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 
 const app = express();
+
+// Trust proxy for Railway
+app.set('trust proxy', 1);
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
-// Session configuration with fallback
+// Session configuration with proper Railway support
 let sessionConfig: any = {
   secret: process.env.SESSION_SECRET || 'chat-app-secret-key-change-in-production',
   resave: false,
   saveUninitialized: false,
   cookie: {
-    secure: false, // Disable secure cookies for now to ensure sessions work
+    secure: false, // Railway uses reverse proxy, keep false
     httpOnly: true,
     maxAge: 24 * 60 * 60 * 1000, // 24 hours
-    sameSite: 'lax' // Use lax instead of strict for better compatibility
-  }
+    sameSite: 'lax'
+  },
+  name: 'sessionId'
 };
 
 // Use PostgreSQL session store if DATABASE_URL is available
