@@ -172,7 +172,7 @@ export default function Home({ currentUser, isGuest, onLogout }: HomeProps) {
         });
         
         if (response.ok) {
-          const data = await ngrokResponse.json();
+          const data = await response.json();
           chatId = data.chat.id;
           setCurrentChatId(chatId);
           queryClient.invalidateQueries({ queryKey: ['user-chats'] });
