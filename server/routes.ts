@@ -10,6 +10,19 @@ declare module 'express-serve-static-core' {
 }
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  // Error handling middleware
+  app.use('/api', (req, res, next) => {
+    // Add CORS headers for Railway
+    res.header('Access-Control-Allow-Origin', '*');
+    res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+    res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
+    
+    if (req.method === 'OPTIONS') {
+      return res.sendStatus(200);
+    }
+    next();
+  });
+
   // put application routes here
   // prefix all routes with /api
   
@@ -120,8 +133,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Endpoint pro načtení logů
   app.get('/api/logs', async (req, res) => {
     try {
+      console.log('Fetching logs, session:', !!req.session);
       const limit = parseInt(req.query.limit as string) || 50;
       const logs = await storage.getLogs(limit);
+      console.log('Found logs:', logs.length);
       res.json({ logs });
     } catch (error) {
       console.error('Error fetching logs:', error);
@@ -132,8 +147,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Endpoint pro načtení errorů
   app.get('/api/errors', async (req, res) => {
     try {
+      console.log('Fetching errors, session:', !!req.session);
       const limit = parseInt(req.query.limit as string) || 50;
       const errors = await storage.getErrors(limit);
+      console.log('Found errors:', errors.length);
       res.json({ errors });
     } catch (error) {
       console.error('Error fetching errors:', error);
@@ -144,15 +161,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Auth endpoints
   app.post('/api/auth/register', async (req, res) => {
     try {
+      console.log('Registration attempt:', { body: req.body, hasSession: !!req.session });
+      
       const { username, password } = req.body;
       
       if (!username || !password) {
+        console.log('Missing username or password');
         return res.status(400).json({ error: 'Username and password required' });
       }
 
       // Check if user already exists
       const existingUser = await storage.getUserByUsername(username);
       if (existingUser) {
+        console.log('User already exists:', username);
         return res.status(400).json({ error: 'Username already exists' });
       }
 
@@ -161,7 +182,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       await storage.addLog('info', 'User registered', { username });
       
       // Set session
-      req.session.userId = user.id;
+      if (req.session) {
+        req.session.userId = user.id;
+        console.log('Session set for user:', user.id);
+      } else {
+        console.log('No session available');
+      }
       
       res.json({ 
         success: true, 
@@ -176,19 +202,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post('/api/auth/login', async (req, res) => {
     try {
+      console.log('Login attempt:', { body: req.body, hasSession: !!req.session });
+      
       const { username, password } = req.body;
       
       if (!username || !password) {
+        console.log('Missing username or password');
         return res.status(400).json({ error: 'Username and password required' });
       }
 
       const user = await storage.getUserByUsername(username);
       if (!user || user.password !== password) {
+        console.log('Invalid credentials for user:', username);
         return res.status(401).json({ error: 'Invalid credentials' });
       }
 
       // Set session
-      req.session.userId = user.id;
+      if (req.session) {
+        req.session.userId = user.id;
+        console.log('Session set for user:', user.id);
+      } else {
+        console.log('No session available');
+      }
+      
       await storage.addLog('info', 'User logged in', { username });
       
       res.json({ 
@@ -213,13 +249,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get('/api/auth/me', async (req, res) => {
     try {
+      console.log('Auth check:', { hasSession: !!req.session, sessionUserId: req.session?.userId });
+      
+      if (!req.session) {
+        console.log('No session object');
+        return res.status(401).json({ error: 'Not authenticated' });
+      }
+      
       const userId = req.session.userId;
       if (!userId) {
+        console.log('No userId in session');
         return res.status(401).json({ error: 'Not authenticated' });
       }
 
       const user = await storage.getUser(userId);
       if (!user) {
+        console.log('User not found:', userId);
         return res.status(401).json({ error: 'User not found' });
       }
 

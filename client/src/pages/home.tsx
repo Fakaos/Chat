@@ -276,16 +276,29 @@ export default function Home({ currentUser, isGuest, onLogout }: HomeProps) {
   const fetchLogs = async () => {
     try {
       const response = await fetch('/api/logs');
-      if (response.ok) {
-        const data = await response.json();
-        setLogs(data.logs);
-        setShowLogs(true);
-        setShowErrors(false);
+      console.log('Logs response status:', response.status);
+      
+      if (!response.ok) {
+        const contentType = response.headers.get('content-type');
+        if (contentType && contentType.includes('application/json')) {
+          const error = await response.json();
+          throw new Error(error.error || 'Failed to fetch logs');
+        } else {
+          const text = await response.text();
+          console.log('Non-JSON logs response:', text.substring(0, 200));
+          throw new Error(`Server error: ${response.status}`);
+        }
       }
+      
+      const data = await response.json();
+      setLogs(data.logs);
+      setShowLogs(true);
+      setShowErrors(false);
     } catch (error) {
+      console.error('Fetch logs error:', error);
       toast({
         title: "Chyba",
-        description: "Nepodařilo se načíst logy.",
+        description: error instanceof Error ? error.message : "Nepodařilo se načíst logy.",
         variant: "destructive"
       });
     }
@@ -294,16 +307,29 @@ export default function Home({ currentUser, isGuest, onLogout }: HomeProps) {
   const fetchErrors = async () => {
     try {
       const response = await fetch('/api/errors');
-      if (response.ok) {
-        const data = await response.json();
-        setErrors(data.errors);
-        setShowErrors(true);
-        setShowLogs(false);
+      console.log('Errors response status:', response.status);
+      
+      if (!response.ok) {
+        const contentType = response.headers.get('content-type');
+        if (contentType && contentType.includes('application/json')) {
+          const error = await response.json();
+          throw new Error(error.error || 'Failed to fetch errors');
+        } else {
+          const text = await response.text();
+          console.log('Non-JSON errors response:', text.substring(0, 200));
+          throw new Error(`Server error: ${response.status}`);
+        }
       }
+      
+      const data = await response.json();
+      setErrors(data.errors);
+      setShowErrors(true);
+      setShowLogs(false);
     } catch (error) {
+      console.error('Fetch errors error:', error);
       toast({
         title: "Chyba",
-        description: "Nepodařilo se načíst errory.",
+        description: error instanceof Error ? error.message : "Nepodařilo se načíst errory.",
         variant: "destructive"
       });
     }

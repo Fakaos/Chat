@@ -19,20 +19,44 @@ export default function Login({ onLoginSuccess, onContinueAsGuest }: LoginProps)
   const authMutation = useMutation({
     mutationFn: async ({ username, password, mode }: { username: string; password: string; mode: 'login' | 'register' }) => {
       const endpoint = mode === 'login' ? '/api/auth/login' : '/api/auth/register';
-      const response = await fetch(endpoint, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ username, password })
-      });
+      
+      try {
+        const response = await fetch(endpoint, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ username, password })
+        });
 
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || 'Authentication failed');
+        console.log('Response status:', response.status);
+        console.log('Response headers:', response.headers);
+
+        if (!response.ok) {
+          const contentType = response.headers.get('content-type');
+          console.log('Content-Type:', contentType);
+          
+          if (contentType && contentType.includes('application/json')) {
+            const error = await response.json();
+            throw new Error(error.error || 'Authentication failed');
+          } else {
+            // Server returned HTML or other non-JSON content
+            const text = await response.text();
+            console.log('Non-JSON response:', text);
+            throw new Error(`Server error: ${response.status}. Please check server logs.`);
+          }
+        }
+
+        const result = await response.json();
+        console.log('Success response:', result);
+        return result;
+      } catch (error) {
+        console.error('Fetch error:', error);
+        if (error instanceof TypeError && error.message.includes('fetch')) {
+          throw new Error('Network error: Cannot connect to server');
+        }
+        throw error;
       }
-
-      return response.json();
     },
     onSuccess: (data) => {
       toast({
