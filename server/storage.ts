@@ -207,7 +207,7 @@ export class DatabaseStorage implements IStorage {
     }
     
     // Use standard PostgreSQL client for Railway
-    if (process.env.NODE_ENV === 'production') {
+    if (process.env.NODE_ENV === 'production' || databaseUrl.includes('railway')) {
       console.log('Using standard PostgreSQL client for Railway');
       const pool = new Pool({
         connectionString: databaseUrl,
@@ -222,6 +222,11 @@ export class DatabaseStorage implements IStorage {
       console.log('Using Neon client for development');
       const sql = neon(databaseUrl);
       this.db = drizzle(sql);
+      
+      // Also initialize tables for Replit if using external database
+      if (databaseUrl && !databaseUrl.includes('neon')) {
+        this.initializeTables();
+      }
     }
   }
 
@@ -346,7 +351,12 @@ export class DatabaseStorage implements IStorage {
     await this.upsertSetting('ngrok_url', url);
   }
 
-  private async initializeTables(): Promise<void> {
+  private initializeTables(): void {
+    // Run async initialization
+    this.doInitializeTables().catch(console.error);
+  }
+
+  private async doInitializeTables(): Promise<void> {
     try {
       console.log('Initializing database tables...');
       
