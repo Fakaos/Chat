@@ -1,11 +1,12 @@
-import { useState } from "react";
-import { useMutation } from "@tanstack/react-query";
+import { useState, useEffect } from "react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import ChatSidebar from "@/components/chat-sidebar";
 
 interface ChatMessage {
   id: string;
@@ -18,15 +19,58 @@ interface LlamaResponse {
   response: string;
 }
 
-export default function Home() {
+interface User {
+  id: string;
+  username: string;
+}
+
+interface HomeProps {
+  currentUser: User | null;
+  isGuest: boolean;
+  onLogout: () => void;
+}
+
+export default function Home({ currentUser, isGuest, onLogout }: HomeProps) {
   const [message, setMessage] = useState("");
   const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [currentChatId, setCurrentChatId] = useState<string | null>(null);
   const [showAdminPanel, setShowAdminPanel] = useState(false);
   const [adminPassword, setAdminPassword] = useState("");
   const [isAdminAuthenticated, setIsAdminAuthenticated] = useState(false);
   const [ngrokUrl, setNgrokUrl] = useState("https://0c8125184293.ngrok-free.app");
   const [tempNgrokUrl, setTempNgrokUrl] = useState("");
+  const [isLoadingUrl, setIsLoadingUrl] = useState(true);
+  const [showLogs, setShowLogs] = useState(false);
+  const [showErrors, setShowErrors] = useState(false);
+  const [logs, setLogs] = useState<any[]>([]);
+  const [errors, setErrors] = useState<any[]>([]);
   const { toast } = useToast();
+  const queryClient = useQueryClient();
+
+  // Načtení ngrok URL při načtení komponenty
+  useEffect(() => {
+    const loadNgrokUrl = async () => {
+      try {
+        const response = await fetch('/api/settings/ngrok-url');
+        console.log('Response status:', response.status);
+        if (response.ok) {
+          const data = await response.json();
+          console.log('Loaded ngrok URL:', data.ngrokUrl);
+          setNgrokUrl(data.ngrokUrl);
+        } else {
+          console.error('Failed to load ngrok URL, status:', response.status);
+        }
+      } catch (error) {
+        console.error('Error loading ngrok URL:', error);
+        // Fallback na default hodnotu
+        setNgrokUrl("https://0c8125184293.ngrok-free.app");
+      } finally {
+        setIsLoadingUrl(false);
+      }
+    };
+
+    loadNgrokUrl();
+  }, []);
 
   const chatMutation = useMutation({
     mutationFn: async (prompt: string): Promise<LlamaResponse> => {
@@ -49,22 +93,30 @@ export default function Home() {
 
       return response.json();
     },
-    onSuccess: (data, prompt) => {
-      const userMessage: ChatMessage = {
-        id: Date.now().toString(),
-        type: 'user',
-        content: prompt,
-        timestamp: getCurrentTime()
-      };
-
+    onSuccess: async (data) => {
       const aiMessage: ChatMessage = {
-        id: (Date.now() + 1).toString(),
+        id: Date.now().toString(),
         type: 'ai',
         content: data.response || 'Odpověď byla přijata, ale obsah není dostupný.',
         timestamp: getCurrentTime()
       };
 
-      setMessages(prev => [...prev, userMessage, aiMessage]);
+      setMessages(prev => [...prev, aiMessage]);
+
+      // Uložit AI odpověď do databáze pokud není guest
+      if (!isGuest && currentChatId && currentUser) {
+        try {
+          await fetch(`/api/chats/${currentChatId}/messages`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ type: 'ai', content: aiMessage.content })
+          });
+        } catch (error) {
+          console.error('Error saving AI message:', error);
+        }
+      }
     },
     onError: (error) => {
       toast({
@@ -76,7 +128,7 @@ export default function Home() {
     }
   });
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     const trimmedMessage = message.trim();
@@ -90,6 +142,53 @@ export default function Home() {
     }
 
     if (chatMutation.isPending) return;
+
+    // Pokud není aktuální chat a uživatel není guest, vytvoř nový chat
+    let chatId = currentChatId;
+    if (!isGuest && !chatId && currentUser) {
+      try {
+        const response = await fetch('/api/chats', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ title: `Chat ${Date.now()}` })
+        });
+        
+        if (response.ok) {
+          const data = await response.json();
+          chatId = data.chat.id;
+          setCurrentChatId(chatId);
+          queryClient.invalidateQueries({ queryKey: ['chats'] });
+        }
+      } catch (error) {
+        console.error('Error creating chat:', error);
+      }
+    }
+
+    // Přidej user zprávu ihned
+    const userMessage: ChatMessage = {
+      id: Date.now().toString(),
+      type: 'user',
+      content: trimmedMessage,
+      timestamp: getCurrentTime()
+    };
+    setMessages(prev => [...prev, userMessage]);
+
+    // Uložit zprávu do databáze pokud není guest
+    if (!isGuest && chatId && currentUser) {
+      try {
+        await fetch(`/api/chats/${chatId}/messages`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ type: 'user', content: trimmedMessage })
+        });
+      } catch (error) {
+        console.error('Error saving message:', error);
+      }
+    }
 
     chatMutation.mutate(trimmedMessage);
     setMessage("");
@@ -127,14 +226,42 @@ export default function Home() {
     setAdminPassword("");
   };
 
-  const handleSaveNgrokUrl = () => {
-    if (tempNgrokUrl.trim()) {
-      setNgrokUrl(tempNgrokUrl.trim());
+  const saveNgrokUrlMutation = useMutation({
+    mutationFn: async (url: string) => {
+      const response = await fetch('/api/settings/ngrok-url', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ ngrokUrl: url })
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to save URL');
+      }
+
+      return response.json();
+    },
+    onSuccess: (data) => {
+      setNgrokUrl(data.ngrokUrl);
       setShowAdminPanel(false);
       toast({
         title: "URL aktualizována",
-        description: "Nová ngrok URL byla uložena.",
+        description: "Nová ngrok URL byla globálně uložena.",
       });
+    },
+    onError: (error) => {
+      toast({
+        title: "Chyba při ukládání",
+        description: "Nepodařilo se uložit ngrok URL. Zkuste to znovu.",
+        variant: "destructive"
+      });
+    }
+  });
+
+  const handleSaveNgrokUrl = () => {
+    if (tempNgrokUrl.trim()) {
+      saveNgrokUrlMutation.mutate(tempNgrokUrl.trim());
     }
   };
 
@@ -142,13 +269,94 @@ export default function Home() {
     setIsAdminAuthenticated(false);
     setShowAdminPanel(false);
     setTempNgrokUrl("");
+    setShowLogs(false);
+    setShowErrors(false);
+  };
+
+  const fetchLogs = async () => {
+    try {
+      const response = await fetch('/api/logs');
+      if (response.ok) {
+        const data = await response.json();
+        setLogs(data.logs);
+        setShowLogs(true);
+        setShowErrors(false);
+      }
+    } catch (error) {
+      toast({
+        title: "Chyba",
+        description: "Nepodařilo se načíst logy.",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const fetchErrors = async () => {
+    try {
+      const response = await fetch('/api/errors');
+      if (response.ok) {
+        const data = await response.json();
+        setErrors(data.errors);
+        setShowErrors(true);
+        setShowLogs(false);
+      }
+    } catch (error) {
+      toast({
+        title: "Chyba",
+        description: "Nepodařilo se načíst errory.",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleChatSelect = async (chatId: string) => {
+    setCurrentChatId(chatId);
+    setMessages([]); // Clear current messages
+    
+    // Načti zprávy z vybraného chatu
+    try {
+      const response = await fetch(`/api/chats/${chatId}/messages`);
+      if (response.ok) {
+        const data = await response.json();
+        const formattedMessages = data.messages.map((msg: any) => ({
+          id: msg.id,
+          type: msg.type,
+          content: msg.content,
+          timestamp: new Date(msg.createdAt).toLocaleTimeString('cs-CZ', { 
+            hour: '2-digit', 
+            minute: '2-digit' 
+          })
+        }));
+        setMessages(formattedMessages);
+      }
+    } catch (error) {
+      console.error('Error loading chat messages:', error);
+    }
+  };
+
+  const handleNewChat = () => {
+    setCurrentChatId(null);
+    setMessages([]);
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
-      {/* Admin Button */}
-      <div className="fixed top-4 right-4 z-10">
-        <Dialog open={showAdminPanel} onOpenChange={setShowAdminPanel}>
+    <div className="min-h-screen bg-slate-50 flex">
+      {/* Sidebar for authenticated users */}
+      {!isGuest && currentUser && (
+        <ChatSidebar
+          currentUser={currentUser}
+          currentChatId={currentChatId}
+          onChatSelect={handleChatSelect}
+          onNewChat={handleNewChat}
+          onLogout={onLogout}
+        />
+      )}
+
+      {/* Main content */}
+      <div className={`flex-1 flex items-center justify-center p-4 ${!isGuest && currentUser ? '' : 'min-h-screen'}`}>
+        {/* Admin Button */}
+        <div className="fixed top-4 right-4 z-10">
+          <Dialog open={showAdminPanel} onOpenChange={setShowAdminPanel}>
           <DialogTrigger asChild>
             <Button
               variant="outline" 
@@ -192,45 +400,119 @@ export default function Home() {
               </div>
             ) : (
               <div className="space-y-4">
-                <div className="space-y-2">
-                  <label htmlFor="ngrok-url" className="text-sm font-medium">
-                    Ngrok URL:
-                  </label>
-                  <Input
-                    id="ngrok-url"
-                    type="url"
-                    value={tempNgrokUrl}
-                    onChange={(e) => setTempNgrokUrl(e.target.value)}
-                    placeholder="https://xxxxx.ngrok-free.app"
-                    data-testid="input-ngrok-url"
-                  />
-                  <p className="text-xs text-slate-500">
-                    Aktuální: {ngrokUrl}
-                  </p>
-                </div>
-                <div className="flex space-x-2">
-                  <Button onClick={handleSaveNgrokUrl} className="flex-1" data-testid="button-save-url">
-                    Uložit URL
-                  </Button>
-                  <Button variant="outline" onClick={handleAdminLogout} className="flex-1">
-                    Odhlásit
-                  </Button>
-                </div>
+                {!showLogs && !showErrors ? (
+                  <>
+                    <div className="space-y-2">
+                      <label htmlFor="ngrok-url" className="text-sm font-medium">
+                        Ngrok URL:
+                      </label>
+                      <Input
+                        id="ngrok-url"
+                        type="url"
+                        value={tempNgrokUrl}
+                        onChange={(e) => setTempNgrokUrl(e.target.value)}
+                        placeholder="https://xxxxx.ngrok-free.app"
+                        data-testid="input-ngrok-url"
+                      />
+                      <p className="text-xs text-slate-500">
+                        Aktuální: {isLoadingUrl ? 'Načítá se...' : ngrokUrl}
+                      </p>
+                    </div>
+                    <div className="flex space-x-2">
+                      <Button 
+                        onClick={handleSaveNgrokUrl} 
+                        className="flex-1" 
+                        data-testid="button-save-url"
+                        disabled={saveNgrokUrlMutation.isPending}
+                      >
+                        {saveNgrokUrlMutation.isPending ? 'Ukládá se...' : 'Uložit URL'}
+                      </Button>
+                      <Button variant="outline" onClick={handleAdminLogout} className="flex-1">
+                        Odhlásit
+                      </Button>
+                    </div>
+                    <div className="border-t pt-4">
+                      <div className="grid grid-cols-2 gap-2">
+                        <Button variant="outline" onClick={fetchLogs} className="text-sm">
+                          <i className="fas fa-list mr-2"></i>
+                          Zobrazit logy
+                        </Button>
+                        <Button variant="outline" onClick={fetchErrors} className="text-sm">
+                          <i className="fas fa-exclamation-triangle mr-2"></i>
+                          Zobrazit errory
+                        </Button>
+                      </div>
+                    </div>
+                  </>
+                ) : (
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <h3 className="font-medium">
+                        {showLogs ? 'Systémové logy' : 'Chybové logy'}
+                      </h3>
+                      <Button variant="ghost" size="sm" onClick={() => { setShowLogs(false); setShowErrors(false); }}>
+                        <i className="fas fa-times"></i>
+                      </Button>
+                    </div>
+                    <div className="max-h-64 overflow-y-auto border rounded p-2 text-xs font-mono bg-slate-50">
+                      {(showLogs ? logs : errors).map((entry, index) => (
+                        <div key={entry.id || index} className="mb-2 pb-1 border-b border-slate-200 last:border-b-0">
+                          <div className="flex justify-between text-slate-600 mb-1">
+                            <span className={`px-1 rounded text-xs ${
+                              entry.level === 'error' ? 'bg-red-100 text-red-700' : 
+                              entry.level === 'warn' ? 'bg-yellow-100 text-yellow-700' : 
+                              'bg-blue-100 text-blue-700'
+                            }`}>
+                              {entry.level.toUpperCase()}
+                            </span>
+                            <span>{new Date(entry.timestamp).toLocaleString('cs-CZ')}</span>
+                          </div>
+                          <div className="text-slate-800">{entry.message}</div>
+                          {entry.data && (
+                            <div className="text-slate-500 text-xs mt-1">
+                              {JSON.stringify(entry.data, null, 2)}
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                      {(showLogs ? logs : errors).length === 0 && (
+                        <div className="text-slate-500 text-center py-4">
+                          {showLogs ? 'Žádné logy k zobrazení' : 'Žádné errory k zobrazení'}
+                        </div>
+                      )}
+                    </div>
+                    <Button variant="outline" onClick={() => { setShowLogs(false); setShowErrors(false); }} className="w-full">
+                      Zpět na nastavení
+                    </Button>
+                  </div>
+                )}
               </div>
             )}
           </DialogContent>
         </Dialog>
-      </div>
-
-      <div className="w-full max-w-2xl">
-        {/* Header */}
-        <div className="text-center mb-8">
-          <h1 className="text-3xl font-semibold text-slate-800 mb-2">
-            <i className="fas fa-comments text-blue-600 mr-3"></i>
-            Chat Aplikace
-          </h1>
-          <p className="text-slate-600">Jednoduchá komunikace s AI modelem</p>
         </div>
+
+        <div className="w-full max-w-2xl">
+          {/* Header */}
+          <div className="text-center mb-8">
+            <h1 className="text-3xl font-semibold text-slate-800 mb-2">
+              <i className="fas fa-comments text-blue-600 mr-3"></i>
+              Chat Aplikace
+            </h1>
+            <p className="text-slate-600">
+              {isGuest ? 'Host režim - Jednoduchá komunikace s AI modelem' : 
+               currentUser ? `Vítejte, ${currentUser.username}!` : 
+               'Jednoduchá komunikace s AI modelem'}
+            </p>
+            {isGuest && (
+              <div className="mt-4">
+                <Button variant="outline" onClick={onLogout} size="sm">
+                  <i className="fas fa-sign-in-alt mr-2"></i>
+                  Přihlásit se
+                </Button>
+              </div>
+            )}
+          </div>
 
         {/* Chat Container */}
         <Card className="bg-white rounded-2xl shadow-lg border border-slate-200 overflow-hidden">
@@ -331,6 +613,7 @@ export default function Home() {
             <i className="fas fa-info-circle mr-1"></i>
             Komunikace probíhá s modelem Llama2:7b
           </p>
+        </div>
         </div>
       </div>
     </div>
