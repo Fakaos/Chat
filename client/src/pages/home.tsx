@@ -55,27 +55,27 @@ export default function Home({ currentUser, isGuest, onLogout }: HomeProps) {
       try {
         // Load ngrok URL
         const ngrokResponse = await fetch('/api/settings/ngrok-url');
-        console.log('Ngrok response status:', ngrokResponse.status);
+        
         if (ngrokResponse.ok) {
           const data = await ngrokResponse.json();
-          console.log('Loaded ngrok URL:', data.ngrokUrl);
+          
           setNgrokUrl(data.ngrokUrl);
         } else {
-          console.error('Failed to load ngrok URL, status:', ngrokResponse.status);
+          
         }
         
         // Load AI model
         const modelResponse = await fetch('/api/admin/ai-model');
-        console.log('AI model response status:', modelResponse.status);
+        
         if (modelResponse.ok) {
           const modelData = await modelResponse.json();
-          console.log('Loaded AI model:', modelData.aiModel);
+          
           setAiModel(modelData.aiModel);
         } else {
-          console.error('Failed to fetch AI model');
+          
         }
       } catch (error) {
-        console.error('Error loading settings:', error);
+        
         // Fallback na default hodnotu
         setNgrokUrl("https://0c8125184293.ngrok-free.app");
       } finally {
@@ -135,7 +135,7 @@ export default function Home({ currentUser, isGuest, onLogout }: HomeProps) {
             body: JSON.stringify({ type: 'ai', content: aiMessage.content })
           });
         } catch (error) {
-          console.error('Error saving AI message:', error);
+          
         }
       }
     },
@@ -145,7 +145,7 @@ export default function Home({ currentUser, isGuest, onLogout }: HomeProps) {
         description: "Nepodařilo se připojit k serveru. Zkuste to prosím znovu.",
         variant: "destructive"
       });
-      console.error('API Error:', error);
+      
     }
   });
 
@@ -183,9 +183,9 @@ export default function Home({ currentUser, isGuest, onLogout }: HomeProps) {
           chatId = data.chat.id;
           setCurrentChatId(chatId);
           queryClient.invalidateQueries({ queryKey: ['user-chats'] });
-          console.log('Auto-created chat:', data.chat.id);
+          
         } else {
-          console.error('Failed to auto-create chat:', response.status);
+          
           toast({
             title: "Chyba",
             description: "Nepodařilo se vytvořit chat. Zkuste se znovu přihlásit.",
@@ -194,7 +194,7 @@ export default function Home({ currentUser, isGuest, onLogout }: HomeProps) {
           return;
         }
       } catch (error) {
-        console.error('Error auto-creating chat:', error);
+        
         toast({
           title: "Chyba připojení",
           description: "Nepodařilo se připojit k serveru.",
@@ -224,7 +224,7 @@ export default function Home({ currentUser, isGuest, onLogout }: HomeProps) {
           body: JSON.stringify({ type: 'user', content: trimmedMessage })
         });
       } catch (error) {
-        console.error('Error saving message:', error);
+        
       }
     }
 
@@ -335,7 +335,7 @@ export default function Home({ currentUser, isGuest, onLogout }: HomeProps) {
         description: "Nepodařilo se uložit AI model.",
         variant: "destructive"
       });
-      console.error('Error saving AI model:', error);
+      
     }
   });
 
@@ -356,7 +356,7 @@ export default function Home({ currentUser, isGuest, onLogout }: HomeProps) {
   const fetchLogs = async () => {
     try {
       const response = await fetch('/api/logs');
-      console.log('Logs response status:', response.status);
+      
       
       if (!response.ok) {
         const contentType = response.headers.get('content-type');
@@ -365,7 +365,7 @@ export default function Home({ currentUser, isGuest, onLogout }: HomeProps) {
           throw new Error(error.error || 'Failed to fetch logs');
         } else {
           const text = await response.text();
-          console.log('Non-JSON logs response:', text.substring(0, 200));
+          
           throw new Error(`Server error: ${response.status}`);
         }
       }
@@ -375,7 +375,7 @@ export default function Home({ currentUser, isGuest, onLogout }: HomeProps) {
       setShowLogs(true);
       setShowErrors(false);
     } catch (error) {
-      console.error('Fetch logs error:', error);
+      
       toast({
         title: "Chyba",
         description: error instanceof Error ? error.message : "Nepodařilo se načíst logy.",
@@ -387,7 +387,7 @@ export default function Home({ currentUser, isGuest, onLogout }: HomeProps) {
   const fetchErrors = async () => {
     try {
       const response = await fetch('/api/errors');
-      console.log('Errors response status:', response.status);
+      
       
       if (!response.ok) {
         const contentType = response.headers.get('content-type');
@@ -396,7 +396,7 @@ export default function Home({ currentUser, isGuest, onLogout }: HomeProps) {
           throw new Error(error.error || 'Failed to fetch errors');
         } else {
           const text = await response.text();
-          console.log('Non-JSON errors response:', text.substring(0, 200));
+          
           throw new Error(`Server error: ${response.status}`);
         }
       }
@@ -406,7 +406,7 @@ export default function Home({ currentUser, isGuest, onLogout }: HomeProps) {
       setShowErrors(true);
       setShowLogs(false);
     } catch (error) {
-      console.error('Fetch errors error:', error);
+      
       toast({
         title: "Chyba",
         description: error instanceof Error ? error.message : "Nepodařilo se načíst errory.",
@@ -436,14 +436,14 @@ export default function Home({ currentUser, isGuest, onLogout }: HomeProps) {
         setMessages(formattedMessages);
       }
     } catch (error) {
-      console.error('Error loading chat messages:', error);
+      
     }
   };
 
   const handleNewChat = async () => {
     setCurrentChatId(null);
     setMessages([]);
-    console.log('New chat initiated from home');
+    
   };
 
   return (

@@ -1,9 +1,10 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
+import ReCAPTCHA from "react-google-recaptcha";
 
 interface LoginProps {
   onLoginSuccess: (user: { id: string; username: string }) => void;
@@ -14,10 +15,12 @@ export default function Login({ onLoginSuccess, onContinueAsGuest }: LoginProps)
   const [mode, setMode] = useState<'login' | 'register'>('login');
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
+  const recaptchaRef = useRef<ReCAPTCHA>(null);
   const { toast } = useToast();
 
   const authMutation = useMutation({
-    mutationFn: async ({ username, password, mode }: { username: string; password: string; mode: 'login' | 'register' }) => {
+    mutationFn: async ({ username, password, mode, captchaToken }: { username: string; password: string; mode: 'login' | 'register'; captchaToken: string | null }) => {
       const endpoint = mode === 'login' ? '/api/auth/login' : '/api/auth/register';
       
       try {
@@ -27,34 +30,26 @@ export default function Login({ onLoginSuccess, onContinueAsGuest }: LoginProps)
             'Content-Type': 'application/json',
           },
           credentials: 'include',
-          body: JSON.stringify({ username, password })
+          body: JSON.stringify({ username, password, captchaToken })
         });
-
-        console.log('Response status:', response.status);
-        console.log('Response headers:', response.headers);
 
         if (!response.ok) {
           const contentType = response.headers.get('content-type');
-          console.log('Content-Type:', contentType);
           
           if (contentType && contentType.includes('application/json')) {
             const error = await response.json();
             throw new Error(error.error || 'Authentication failed');
           } else {
             // Server returned HTML or other non-JSON content
-            const text = await response.text();
-            console.log('Non-JSON response:', text);
-            throw new Error(`Server error: ${response.status}. Please check server logs.`);
+            throw new Error('Chyba serveru. Zkuste to prosím později.');
           }
         }
 
         const result = await response.json();
-        console.log('Success response:', result);
         return result;
       } catch (error) {
-        console.error('Fetch error:', error);
         if (error instanceof TypeError && error.message.includes('fetch')) {
-          throw new Error('Network error: Cannot connect to server');
+          throw new Error('Chyba připojení k serveru.');
         }
         throw error;
       }
@@ -64,6 +59,9 @@ export default function Login({ onLoginSuccess, onContinueAsGuest }: LoginProps)
         title: mode === 'login' ? "Přihlášení úspěšné" : "Registrace úspěšná",
         description: `Vítejte, ${data.user.username}!`,
       });
+      // Reset CAPTCHA after successful submission
+      recaptchaRef.current?.reset();
+      setCaptchaToken(null);
       onLoginSuccess(data.user);
     },
     onError: (error) => {
@@ -72,6 +70,9 @@ export default function Login({ onLoginSuccess, onContinueAsGuest }: LoginProps)
         description: error.message,
         variant: "destructive"
       });
+      // Reset CAPTCHA after failed submission
+      recaptchaRef.current?.reset();
+      setCaptchaToken(null);
     }
   });
 
@@ -87,7 +88,20 @@ export default function Login({ onLoginSuccess, onContinueAsGuest }: LoginProps)
       return;
     }
 
-    authMutation.mutate({ username: username.trim(), password, mode });
+    if (!captchaToken) {
+      toast({
+        title: "Chyba",
+        description: "Prosím dokončete CAPTCHA ověření.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    authMutation.mutate({ username: username.trim(), password, mode, captchaToken });
+  };
+
+  const handleCaptchaChange = (token: string | null) => {
+    setCaptchaToken(token);
   };
 
   return (
@@ -135,6 +149,17 @@ export default function Login({ onLoginSuccess, onContinueAsGuest }: LoginProps)
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="Zadejte heslo"
                   disabled={authMutation.isPending}
+                />
+              </div>
+
+              {/* CAPTCHA */}
+              <div className="flex justify-center">
+                <ReCAPTCHA
+                  ref={recaptchaRef}
+                  sitekey={import.meta.env.VITE_RECAPTCHA_SITE_KEY || "6LeIxAcTAAAAAJcZVRqyHh71UMIEGNQ_MXjiZKhI"}
+                  onChange={handleCaptchaChange}
+                  onExpired={() => setCaptchaToken(null)}
+                  onError={() => setCaptchaToken(null)}
                 />
               </div>
 

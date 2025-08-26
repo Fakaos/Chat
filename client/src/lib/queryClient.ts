@@ -2,8 +2,13 @@ import { QueryClient, QueryFunction } from "@tanstack/react-query";
 
 async function throwIfResNotOk(res: Response) {
   if (!res.ok) {
-    const text = (await res.text()) || res.statusText;
-    throw new Error(`${res.status}: ${text}`);
+    const text = await res.text();
+    try {
+      const errorData = JSON.parse(text);
+      throw new Error(errorData.error || 'Chyba serveru');
+    } catch {
+      throw new Error('Chyba připojení k serveru');
+    }
   }
 }
 

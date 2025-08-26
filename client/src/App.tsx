@@ -30,7 +30,7 @@ function App() {
           setCurrentUser(data.user);
         }
       } catch (error) {
-        console.error('Auth check failed:', error);
+        // Silent auth check failure
       } finally {
         setIsLoading(false);
       }
@@ -56,7 +56,7 @@ function App() {
         credentials: 'include'
       });
     } catch (error) {
-      console.error('Logout failed:', error);
+      // Silent logout failure
     } finally {
       setCurrentUser(null);
       setIsGuest(false);

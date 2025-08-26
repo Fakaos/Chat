@@ -13,16 +13,16 @@ app.set('trust proxy', 1);
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
-// Session configuration - use MemoryStore for Replit development
+// Session configuration - secure settings for production
 let sessionConfig: any = {
   secret: process.env.SESSION_SECRET || 'replit-chat-app-session-secret-2025',
   resave: false,
-  saveUninitialized: true,
+  saveUninitialized: false, // Don't create sessions until needed - security best practice
   cookie: {
-    secure: false, // Keep false for Replit
-    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production', // HTTPS only in production
+    httpOnly: true, // Prevent XSS access to cookies
     maxAge: 24 * 60 * 60 * 1000, // 24 hours
-    sameSite: 'lax',
+    sameSite: 'strict', // CSRF protection
   },
   name: 'sessionId'
 };
@@ -34,9 +34,9 @@ if (process.env.NODE_ENV === 'production' && process.env.DATABASE_URL?.includes(
     conString: process.env.DATABASE_URL,
     createTableIfMissing: true,
   });
-  console.log('Using PostgreSQL session store for production');
+  // Production session store configured
 } else {
-  console.log('Using MemoryStore for development sessions');
+  // Development session store in memory
 }
 
 app.use(session(sessionConfig));
@@ -54,17 +54,9 @@ app.use((req, res, next) => {
 
   res.on("finish", () => {
     const duration = Date.now() - start;
-    if (path.startsWith("/api")) {
-      let logLine = `${req.method} ${path} ${res.statusCode} in ${duration}ms`;
-      if (capturedJsonResponse) {
-        logLine += ` :: ${JSON.stringify(capturedJsonResponse)}`;
-      }
-
-      if (logLine.length > 80) {
-        logLine = logLine.slice(0, 79) + "…";
-      }
-
-      log(logLine);
+    if (path.startsWith("/api") && process.env.NODE_ENV === 'development') {
+      // Only log API requests in development, don't log response data
+      log(`${req.method} ${path} ${res.statusCode} in ${duration}ms`);
     }
   });
 
@@ -76,10 +68,17 @@ app.use((req, res, next) => {
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
     const status = err.status || err.statusCode || 500;
-    const message = err.message || "Internal Server Error";
+    // Don't expose internal error details in production
+    const message = status === 500 && process.env.NODE_ENV === 'production' 
+      ? 'Server error' 
+      : (err.message || "Internal Server Error");
 
-    res.status(status).json({ message });
-    throw err;
+    res.status(status).json({ error: message });
+    
+    // Log error internally but don't throw in production
+    if (process.env.NODE_ENV === 'development') {
+      console.error(err);
+    }
   });
 
   // importantly only setup vite in development and after

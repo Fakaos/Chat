@@ -36,7 +36,7 @@ export default function ChatSidebar({
   const { data: chatsData, isLoading, error } = useQuery({
     queryKey: ['user-chats', currentUser.id],
     queryFn: async () => {
-      console.log('Fetching chats for user:', currentUser.id);
+      
       const response = await fetch('/api/chats', {
         method: 'GET',
         credentials: 'include', // Include session cookies
@@ -48,16 +48,16 @@ export default function ChatSidebar({
       
       if (!response.ok) {
         if (response.status === 401) {
-          console.log('User not authenticated, will need to re-login');
+          
           throw new Error('Not authenticated');
         }
         const errorText = await response.text();
-        console.error('Failed to fetch chats:', response.status, errorText);
+        
         throw new Error(`Failed to fetch chats: ${response.status}`);
       }
       
       const data = await response.json();
-      console.log('Fetched chats:', data);
+      
       return data;
     },
     enabled: !!currentUser?.id, // Only fetch when user is logged in
@@ -80,7 +80,7 @@ export default function ChatSidebar({
       const chatNumber = chats.length + 1;
       const title = `Chat ${chatNumber}`;
       
-      console.log('Creating new chat:', title);
+      
       const response = await fetch('/api/chats', {
         method: 'POST',
         credentials: 'include',
@@ -93,12 +93,12 @@ export default function ChatSidebar({
 
       if (!response.ok) {
         const errorText = await response.text();
-        console.error('Failed to create chat:', response.status, errorText);
+        
         throw new Error('Failed to create chat');
       }
 
       const data = await response.json();
-      console.log('Created chat:', data);
+      
       return data;
     },
     onSuccess: (data) => {
@@ -110,7 +110,7 @@ export default function ChatSidebar({
       });
     },
     onError: (error) => {
-      console.error('Create chat error:', error);
+      
       toast({
         title: "Chyba",
         description: "Nepodařilo se vytvořit nový chat.",
@@ -122,7 +122,7 @@ export default function ChatSidebar({
   // Update chat title mutation
   const updateChatMutation = useMutation({
     mutationFn: async ({ chatId, title }: { chatId: string; title: string }) => {
-      console.log('Updating chat:', chatId, title);
+      
       const response = await fetch(`/api/chats/${chatId}`, {
         method: 'PUT',
         credentials: 'include',
@@ -159,7 +159,7 @@ export default function ChatSidebar({
   // Delete chat mutation
   const deleteChatMutation = useMutation({
     mutationFn: async (chatId: string) => {
-      console.log('Deleting chat:', chatId);
+      
       const response = await fetch(`/api/chats/${chatId}`, {
         method: 'DELETE',
         credentials: 'include'
@@ -215,7 +215,7 @@ export default function ChatSidebar({
   };
 
   if (error) {
-    console.error('Chat sidebar error:', error);
+    
   }
 
   return (

@@ -5,6 +5,8 @@ import { neon } from "@neondatabase/serverless";
 import path from "path";
 import { fileURLToPath } from 'url';
 import { storage, MemStorage, DatabaseStorage, IStorage } from "./storage";
+import bcrypt from "bcrypt";
+import axios from "axios";
 
 // Use fallback storage if database is not available
 let appStorage: IStorage;
@@ -65,6 +67,36 @@ app.use(session(sessionConfig));
 declare module 'express-serve-static-core' {
   interface Request {
     session: any;
+  }
+}
+
+// CAPTCHA verification function
+async function verifyCaptcha(token: string): Promise<boolean> {
+  if (!token) return false;
+  
+  // For development, allow test token
+  if (process.env.NODE_ENV === 'development' && token === 'test-token') {
+    return true;
+  }
+  
+  try {
+    const secretKey = process.env.RECAPTCHA_SECRET_KEY;
+    if (!secretKey) {
+      console.warn('RECAPTCHA_SECRET_KEY not configured, skipping verification');
+      return process.env.NODE_ENV === 'development'; // Allow in dev, block in prod
+    }
+    
+    const response = await axios.post('https://www.google.com/recaptcha/api/siteverify', null, {
+      params: {
+        secret: secretKey,
+        response: token
+      }
+    });
+    
+    return response.data.success === true;
+  } catch (error) {
+    console.error('CAPTCHA verification error:', error);
+    return false;
   }
 }
 
@@ -178,10 +210,16 @@ app.get('/api/errors', async (req, res) => {
 // Auth endpoints
 app.post('/api/auth/register', async (req, res) => {
   try {
-    const { username, password } = req.body;
+    const { username, password, captchaToken } = req.body;
     
     if (!username || !password) {
       return res.status(400).json({ error: 'Username and password required' });
+    }
+
+    // Verify CAPTCHA
+    const captchaValid = await verifyCaptcha(captchaToken);
+    if (!captchaValid) {
+      return res.status(400).json({ error: 'CAPTCHA verification failed' });
     }
 
     const existingUser = await appStorage.getUserByUsername(username);
@@ -189,7 +227,10 @@ app.post('/api/auth/register', async (req, res) => {
       return res.status(400).json({ error: 'Username already exists' });
     }
 
-    const user = await appStorage.createUser({ username, password });
+    // Hash password before storing
+    const saltRounds = 12;
+    const hashedPassword = await bcrypt.hash(password, saltRounds);
+    const user = await appStorage.createUser({ username, password: hashedPassword });
     await appStorage.addLog('info', 'User registered', { username }, user.id, username, 'register');
     
     if (req.session) {
@@ -220,14 +261,26 @@ app.post('/api/auth/register', async (req, res) => {
 
 app.post('/api/auth/login', async (req, res) => {
   try {
-    const { username, password } = req.body;
+    const { username, password, captchaToken } = req.body;
     
     if (!username || !password) {
       return res.status(400).json({ error: 'Username and password required' });
     }
 
+    // Verify CAPTCHA
+    const captchaValid = await verifyCaptcha(captchaToken);
+    if (!captchaValid) {
+      return res.status(400).json({ error: 'CAPTCHA verification failed' });
+    }
+
     const user = await appStorage.getUserByUsername(username);
-    if (!user || user.password !== password) {
+    if (!user) {
+      return res.status(401).json({ error: 'Invalid credentials' });
+    }
+
+    // Verify password using bcrypt
+    const passwordMatch = await bcrypt.compare(password, user.password);
+    if (!passwordMatch) {
       return res.status(401).json({ error: 'Invalid credentials' });
     }
 
