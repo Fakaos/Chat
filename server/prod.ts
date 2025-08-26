@@ -70,35 +70,7 @@ declare module 'express-serve-static-core' {
   }
 }
 
-// CAPTCHA verification function
-async function verifyCaptcha(token: string): Promise<boolean> {
-  if (!token) return false;
-  
-  // For development, allow test token
-  if (process.env.NODE_ENV === 'development' && token === 'test-token') {
-    return true;
-  }
-  
-  try {
-    const secretKey = process.env.RECAPTCHA_SECRET_KEY;
-    if (!secretKey) {
-      console.warn('RECAPTCHA_SECRET_KEY not configured, skipping verification');
-      return process.env.NODE_ENV === 'development'; // Allow in dev, block in prod
-    }
-    
-    const response = await axios.post('https://www.google.com/recaptcha/api/siteverify', null, {
-      params: {
-        secret: secretKey,
-        response: token
-      }
-    });
-    
-    return response.data.success === true;
-  } catch (error) {
-    console.error('CAPTCHA verification error:', error);
-    return false;
-  }
-}
+
 
 // CORS headers for Railway
 app.use('/api', (req, res, next) => {
@@ -210,16 +182,10 @@ app.get('/api/errors', async (req, res) => {
 // Auth endpoints
 app.post('/api/auth/register', async (req, res) => {
   try {
-    const { username, password, captchaToken } = req.body;
+    const { username, password } = req.body;
     
     if (!username || !password) {
       return res.status(400).json({ error: 'Username and password required' });
-    }
-
-    // Verify CAPTCHA
-    const captchaValid = await verifyCaptcha(captchaToken);
-    if (!captchaValid) {
-      return res.status(400).json({ error: 'CAPTCHA verification failed' });
     }
 
     const existingUser = await appStorage.getUserByUsername(username);
@@ -261,16 +227,10 @@ app.post('/api/auth/register', async (req, res) => {
 
 app.post('/api/auth/login', async (req, res) => {
   try {
-    const { username, password, captchaToken } = req.body;
+    const { username, password } = req.body;
     
     if (!username || !password) {
       return res.status(400).json({ error: 'Username and password required' });
-    }
-
-    // Verify CAPTCHA
-    const captchaValid = await verifyCaptcha(captchaToken);
-    if (!captchaValid) {
-      return res.status(400).json({ error: 'CAPTCHA verification failed' });
     }
 
     const user = await appStorage.getUserByUsername(username);

@@ -6,6 +6,16 @@ This is a full-stack web application built with React and Express, featuring a c
 
 Preferred communication style: Simple, everyday language.
 
+# Recent Changes
+
+## 2025-01-26
+- Changed application name from "Chat Aplikace" to "Uncensored ChatBot" throughout the application
+- Added settings panel with dark/light theme switcher in sidebar
+- Implemented full dark mode support for all UI components
+- Removed CAPTCHA functionality completely for Railway deployment compatibility
+- Deleted old routes_old.ts file that contained CAPTCHA verification code
+- Ensured current routes.ts has no CAPTCHA dependencies
+
 # System Architecture
 
 ## Frontend Architecture
