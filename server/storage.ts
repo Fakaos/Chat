@@ -400,7 +400,7 @@ export class DatabaseStorage implements IStorage {
   }
 }
 
-// Export storage instance conditionally - use MemStorage for development to avoid SSL issues
-export const storage = (process.env.NODE_ENV === 'production' && process.env.DATABASE_URL) ? 
+// Export storage instance - use DatabaseStorage when DATABASE_URL is available
+export const storage = process.env.DATABASE_URL ? 
   new DatabaseStorage(process.env.DATABASE_URL) : 
   new MemStorage();
