@@ -8,6 +8,14 @@ Preferred communication style: Simple, everyday language.
 
 # Recent Changes
 
+## 2025-08-26
+- Fixed Railway deployment issues with white screen on startup
+- Completely rewrote server/prod.ts to use registerRoutes function from routes.ts
+- Removed all duplicate authentication and API routes from prod.ts  
+- Fixed static file serving paths for Railway production environment
+- Added comprehensive error logging and debugging for Railway deployment
+- Ensured all CAPTCHA references are completely removed from production code
+
 ## 2025-01-26
 - Changed application name from "Chat Aplikace" to "Uncensored ChatBot" throughout the application
 - Added settings panel with dark/light theme switcher in sidebar
