@@ -214,28 +214,16 @@ export class DatabaseStorage implements IStorage {
       throw new Error('Database URL is required for DatabaseStorage');
     }
     
-    // Use standard PostgreSQL client for Railway
-    if (process.env.NODE_ENV === 'production' || databaseUrl.includes('railway')) {
-      console.log('Using standard PostgreSQL client for Railway');
-      const pool = new Pool({
-        connectionString: databaseUrl,
-        ssl: databaseUrl.includes('railway') ? { rejectUnauthorized: false } : false
-      });
-      this.db = pgDrizzle(pool);
-      
-      // Initialize tables for Railway
-      this.initializeTables();
-    } else {
-      // Use Neon for development (Replit)
-      console.log('Using Neon client for development');
-      const sql = neon(databaseUrl);
-      this.db = drizzle(sql);
-      
-      // Also initialize tables for Replit if using external database
-      if (databaseUrl && !databaseUrl.includes('neon')) {
-        this.initializeTables();
-      }
-    }
+    // Use standard PostgreSQL client for all environments
+    console.log('Using standard PostgreSQL client');
+    const pool = new Pool({
+      connectionString: databaseUrl,
+      ssl: databaseUrl.includes('railway') ? { rejectUnauthorized: false } : (databaseUrl.includes('neon') ? { rejectUnauthorized: false } : false)
+    });
+    this.db = pgDrizzle(pool);
+    
+    // Initialize tables
+    this.initializeTables();
   }
 
   async getUser(id: string): Promise<User | undefined> {
