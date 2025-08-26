@@ -541,6 +541,19 @@ ${prompt}`;
     }
   });
 
+  app.get('/api/errors', async (req, res) => {
+    if (process.env.NODE_ENV !== 'development') {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+    
+    try {
+      const errors = await storage.getErrors(50);
+      res.json({ errors });
+    } catch (error) {
+      res.status(500).json({ error: 'Failed to fetch errors' });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }
