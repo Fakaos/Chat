@@ -742,7 +742,18 @@ export default function Home({ currentUser, isGuest, onLogout }: HomeProps) {
             {chatMutation.isPending && (
               <div className="mt-4 flex items-center justify-center space-x-2 text-slate-600 dark:text-slate-300" data-testid="loading-indicator">
                 <div className="animate-spin rounded-full h-4 w-4 border-2 border-blue-600 border-t-transparent"></div>
-                <span className="text-sm">Zpracovávám odpověď...</span>
+                <span className="text-sm">
+                  {message.toLowerCase().includes('najdi') || 
+                   message.toLowerCase().includes('vyhledej') || 
+                   message.toLowerCase().includes('hledej') || 
+                   message.toLowerCase().includes('co se děje') || 
+                   message.toLowerCase().includes('aktuální') || 
+                   message.toLowerCase().includes('novinky') || 
+                   message.toLowerCase().includes('zprávy') || 
+                   message.toLowerCase().includes('na webu') ? 
+                   '🌐 Vyhledávám na webu a zpracovávám odpověď...' : 
+                   'Zpracovávám odpověď...'}
+                </span>
               </div>
             )}
           </div>

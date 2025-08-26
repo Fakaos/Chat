@@ -268,6 +268,71 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Helper function for web search
+  const searchWeb = async (query: string) => {
+    try {
+      await storage.addLog('info', `Searching web for: ${query}`);
+      
+      const searchUrl = `https://api.duckduckgo.com/?q=${encodeURIComponent(query)}&format=json&no_redirect=1&skip_disambig=1`;
+      const response = await fetch(searchUrl, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (compatible; ChatBot/1.0)'
+        },
+        signal: AbortSignal.timeout(10000)
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Search API error: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      
+      // Extract useful information from DuckDuckGo response
+      let searchResults = '';
+      
+      // Abstract (main answer)
+      if (data.Abstract) {
+        searchResults += `Hlavní informace: ${data.Abstract}\n\n`;
+      }
+      
+      // Related topics
+      if (data.RelatedTopics && data.RelatedTopics.length > 0) {
+        searchResults += 'Souvisící témata:\n';
+        data.RelatedTopics.slice(0, 3).forEach((topic: any, index: number) => {
+          if (topic.Text) {
+            searchResults += `${index + 1}. ${topic.Text}\n`;
+          }
+        });
+        searchResults += '\n';
+      }
+      
+      // Infobox data
+      if (data.Infobox && data.Infobox.content && data.Infobox.content.length > 0) {
+        searchResults += 'Další informace:\n';
+        data.Infobox.content.slice(0, 3).forEach((item: any) => {
+          if (item.label && item.value) {
+            searchResults += `${item.label}: ${item.value}\n`;
+          }
+        });
+      }
+      
+      await storage.addLog('info', 'Web search completed', { 
+        query, 
+        hasAbstract: !!data.Abstract,
+        topicsCount: data.RelatedTopics?.length || 0
+      });
+      
+      return searchResults || 'Bohužel se nepodařilo najít relevantní informace.';
+      
+    } catch (error) {
+      await storage.addLog('error', 'Web search failed', { 
+        query, 
+        error: error instanceof Error ? error.message : 'Unknown error' 
+      });
+      return `Omlouvám se, nepodařilo se mi vyhledat informace na webu. Chyba: ${error instanceof Error ? error.message : 'Neznámá chyba'}`;
+    }
+  };
+
   // AI Generation endpoint
   app.post('/api/generate', async (req, res) => {
     try {
@@ -278,9 +343,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: 'Prompt is required' });
       }
 
-      // Create roleplay prompt with conversation history
+      // Detect if this is a search query
+      const searchKeywords = ['najdi', 'vyhledej', 'hledej', 'co se děje', 'aktuální', 'novinky', 'zprávy', 'na webu', 'google', 'search'];
+      const isSearchQuery = searchKeywords.some(keyword => 
+        prompt.toLowerCase().includes(keyword.toLowerCase())
+      );
+
       let finalPrompt = prompt;
-      if (history && Array.isArray(history) && history.length > 0) {
+      let searchResults = '';
+
+      // If it's a search query, perform web search first
+      if (isSearchQuery) {
+        // Extract search terms from the prompt
+        const searchQuery = prompt.replace(/najdi|vyhledej|hledej|na webu|google|mi/gi, '').trim();
+        searchResults = await searchWeb(searchQuery);
+        
+        // Modify the prompt to include search results
+        finalPrompt = `Uživatel se ptá: "${prompt}"
+
+Zde jsou aktuální informace z webového vyhledávání:
+${searchResults}
+
+Na základě těchto informací odpověz uživateli v češtině. Pokud informace nejsou dostatečné, řekni to a pokus se poskytnout obecnou odpověď na základě svých znalostí.`;
+      }
+
+      // Create roleplay prompt with conversation history (only if not a search query)
+      if (!isSearchQuery && history && Array.isArray(history) && history.length > 0) {
         const historyText = history.map((msg: any) => 
           `${msg.type === 'user' ? 'Human' : 'Assistant'}: ${msg.content}`
         ).join('\n');
