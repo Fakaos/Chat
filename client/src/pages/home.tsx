@@ -633,7 +633,7 @@ export default function Home({ currentUser, isGuest, onLogout }: HomeProps) {
         </Dialog>
         </div>
 
-        <div className={`w-full ${!isGuest && currentUser ? 'flex-1 flex flex-col' : 'max-w-2xl'}`}>
+        <div className="w-full max-w-2xl">
           {/* Header */}
           <div className="text-center mb-8">
             <h1 className="text-3xl font-semibold text-slate-800 dark:text-slate-100 mb-2">
@@ -656,10 +656,10 @@ export default function Home({ currentUser, isGuest, onLogout }: HomeProps) {
           </div>
 
         {/* Chat Container */}
-        <Card className={`bg-white dark:bg-slate-800 rounded-2xl shadow-lg border border-slate-200 dark:border-slate-700 overflow-hidden ${!isGuest && currentUser ? 'flex-1 flex flex-col' : ''}`}>
+        <Card className="bg-white dark:bg-slate-800 rounded-2xl shadow-lg border border-slate-200 dark:border-slate-700 overflow-hidden">
           
           {/* Response Area */}
-          <div className={`overflow-y-auto p-6 bg-slate-50 dark:bg-slate-900 border-b border-slate-200 dark:border-slate-700 ${!isGuest && currentUser ? 'flex-1' : 'h-96'}`}>
+          <div className="overflow-y-auto p-6 bg-slate-50 dark:bg-slate-900 border-b border-slate-200 dark:border-slate-700 h-96">
             <div className="space-y-4">
               {/* Welcome message */}
               <div className="flex items-start space-x-3">
