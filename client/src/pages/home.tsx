@@ -447,7 +447,7 @@ export default function Home({ currentUser, isGuest, onLogout }: HomeProps) {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 flex">
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-900 flex">
       {/* Sidebar for authenticated users */}
       {!isGuest && currentUser && (
         <ChatSidebar
@@ -460,7 +460,7 @@ export default function Home({ currentUser, isGuest, onLogout }: HomeProps) {
       )}
 
       {/* Main content */}
-      <div className={`flex-1 flex items-center justify-center p-4 ${!isGuest && currentUser ? '' : 'min-h-screen'}`}>
+      <div className={`flex-1 flex flex-col h-screen ${!isGuest && currentUser ? 'p-4' : 'p-4 items-center justify-center'}`}>
         {/* Admin Button */}
         <div className="fixed top-4 right-4 z-10">
           <Dialog open={showAdminPanel} onOpenChange={setShowAdminPanel}>
@@ -468,7 +468,7 @@ export default function Home({ currentUser, isGuest, onLogout }: HomeProps) {
             <Button
               variant="outline" 
               size="sm"
-              className="bg-white hover:bg-slate-50 border-slate-300"
+              className="bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-200"
               data-testid="button-admin"
             >
               <i className="fas fa-cog mr-2 text-sm"></i>
@@ -633,14 +633,14 @@ export default function Home({ currentUser, isGuest, onLogout }: HomeProps) {
         </Dialog>
         </div>
 
-        <div className="w-full max-w-2xl">
+        <div className={`w-full ${!isGuest && currentUser ? 'flex-1 flex flex-col' : 'max-w-2xl'}`}>
           {/* Header */}
           <div className="text-center mb-8">
-            <h1 className="text-3xl font-semibold text-slate-800 mb-2">
+            <h1 className="text-3xl font-semibold text-slate-800 dark:text-slate-100 mb-2">
               <i className="fas fa-comments text-blue-600 mr-3"></i>
-              Chat Aplikace
+              Uncensored ChatBot
             </h1>
-            <p className="text-slate-600">
+            <p className="text-slate-600 dark:text-slate-300">
               {isGuest ? 'Host režim - Jednoduchá komunikace s AI modelem' : 
                currentUser ? `Vítejte, ${currentUser.username}!` : 
                'Jednoduchá komunikace s AI modelem'}
@@ -656,18 +656,18 @@ export default function Home({ currentUser, isGuest, onLogout }: HomeProps) {
           </div>
 
         {/* Chat Container */}
-        <Card className="bg-white rounded-2xl shadow-lg border border-slate-200 overflow-hidden">
+        <Card className={`bg-white dark:bg-slate-800 rounded-2xl shadow-lg border border-slate-200 dark:border-slate-700 overflow-hidden ${!isGuest && currentUser ? 'flex-1 flex flex-col' : ''}`}>
           
           {/* Response Area */}
-          <div className="h-96 overflow-y-auto p-6 bg-slate-50 border-b border-slate-200">
+          <div className={`overflow-y-auto p-6 bg-slate-50 dark:bg-slate-900 border-b border-slate-200 dark:border-slate-700 ${!isGuest && currentUser ? 'flex-1' : 'h-96'}`}>
             <div className="space-y-4">
               {/* Welcome message */}
               <div className="flex items-start space-x-3">
                 <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0">
                   <i className="fas fa-robot text-blue-600 text-sm"></i>
                 </div>
-                <div className="bg-white rounded-xl rounded-tl-none px-4 py-3 shadow-sm border border-slate-200 max-w-md">
-                  <p className="text-slate-700 text-sm">Vítejte! Napište zprávu a stiskněte Odeslat pro komunikaci s AI modelem.</p>
+                <div className="bg-white dark:bg-slate-800 rounded-xl rounded-tl-none px-4 py-3 shadow-sm border border-slate-200 dark:border-slate-600 max-w-md">
+                  <p className="text-slate-700 dark:text-slate-200 text-sm">Vítejte! Napište zprávu a stiskněte Odeslat pro komunikaci s AI modelem.</p>
                 </div>
               </div>
               
@@ -689,9 +689,9 @@ export default function Home({ currentUser, isGuest, onLogout }: HomeProps) {
                       <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0">
                         <i className="fas fa-robot text-blue-600 text-sm"></i>
                       </div>
-                      <div className="bg-white rounded-xl rounded-tl-none px-4 py-3 shadow-sm border border-slate-200 max-w-md">
-                        <p className="text-slate-700 text-sm" data-testid={`message-ai-${msg.id}`}>{msg.content}</p>
-                        <p className="text-xs text-slate-500 mt-1">{msg.timestamp}</p>
+                      <div className="bg-white dark:bg-slate-800 rounded-xl rounded-tl-none px-4 py-3 shadow-sm border border-slate-200 dark:border-slate-600 max-w-md">
+                        <p className="text-slate-700 dark:text-slate-200 text-sm" data-testid={`message-ai-${msg.id}`}>{msg.content}</p>
+                        <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">{msg.timestamp}</p>
                       </div>
                     </>
                   )}
@@ -701,7 +701,7 @@ export default function Home({ currentUser, isGuest, onLogout }: HomeProps) {
           </div>
 
           {/* Input Form */}
-          <div className="p-6 bg-white">
+          <div className="p-6 bg-white dark:bg-slate-800">
             <form onSubmit={handleSubmit} className="flex space-x-4" data-testid="chat-form">
               {/* Message Input */}
               <div className="flex-1 relative">
@@ -711,12 +711,12 @@ export default function Home({ currentUser, isGuest, onLogout }: HomeProps) {
                   onChange={(e) => setMessage(e.target.value)}
                   onKeyPress={handleKeyPress}
                   placeholder="Napište svou zprávu..."
-                  className="w-full px-4 py-3 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 text-slate-700"
+                  className="w-full px-4 py-3 rounded-xl border border-slate-300 dark:border-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 text-slate-700 dark:text-slate-200 bg-white dark:bg-slate-700"
                   disabled={chatMutation.isPending}
                   data-testid="input-message"
                 />
                 <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
-                  <i className="fas fa-pencil-alt text-slate-400 text-sm"></i>
+                  <i className="fas fa-pencil-alt text-slate-400 dark:text-slate-500 text-sm"></i>
                 </div>
               </div>
 
@@ -740,7 +740,7 @@ export default function Home({ currentUser, isGuest, onLogout }: HomeProps) {
 
             {/* Loading Indicator */}
             {chatMutation.isPending && (
-              <div className="mt-4 flex items-center justify-center space-x-2 text-slate-600" data-testid="loading-indicator">
+              <div className="mt-4 flex items-center justify-center space-x-2 text-slate-600 dark:text-slate-300" data-testid="loading-indicator">
                 <div className="animate-spin rounded-full h-4 w-4 border-2 border-blue-600 border-t-transparent"></div>
                 <span className="text-sm">Zpracovávám odpověď...</span>
               </div>
@@ -749,7 +749,7 @@ export default function Home({ currentUser, isGuest, onLogout }: HomeProps) {
         </Card>
 
         {/* Footer info */}
-        <div className="text-center mt-6 text-slate-500 text-sm">
+        <div className="text-center mt-6 text-slate-500 dark:text-slate-400 text-sm">
           <p>
             <i className="fas fa-info-circle mr-1"></i>
             Komunikace probíhá s modelem Llama2:7b

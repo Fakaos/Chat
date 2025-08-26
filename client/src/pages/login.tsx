@@ -1,10 +1,9 @@
-import { useState, useRef } from "react";
+import { useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import ReCAPTCHA from "react-google-recaptcha";
 
 interface LoginProps {
   onLoginSuccess: (user: { id: string; username: string }) => void;
@@ -15,12 +14,10 @@ export default function Login({ onLoginSuccess, onContinueAsGuest }: LoginProps)
   const [mode, setMode] = useState<'login' | 'register'>('login');
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
-  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
-  const recaptchaRef = useRef<ReCAPTCHA>(null);
   const { toast } = useToast();
 
   const authMutation = useMutation({
-    mutationFn: async ({ username, password, mode, captchaToken }: { username: string; password: string; mode: 'login' | 'register'; captchaToken: string | null }) => {
+    mutationFn: async ({ username, password, mode }: { username: string; password: string; mode: 'login' | 'register' }) => {
       const endpoint = mode === 'login' ? '/api/auth/login' : '/api/auth/register';
       
       try {
@@ -30,7 +27,7 @@ export default function Login({ onLoginSuccess, onContinueAsGuest }: LoginProps)
             'Content-Type': 'application/json',
           },
           credentials: 'include',
-          body: JSON.stringify({ username, password, captchaToken })
+          body: JSON.stringify({ username, password })
         });
 
         if (!response.ok) {
@@ -59,9 +56,6 @@ export default function Login({ onLoginSuccess, onContinueAsGuest }: LoginProps)
         title: mode === 'login' ? "Přihlášení úspěšné" : "Registrace úspěšná",
         description: `Vítejte, ${data.user.username}!`,
       });
-      // Reset CAPTCHA after successful submission
-      recaptchaRef.current?.reset();
-      setCaptchaToken(null);
       onLoginSuccess(data.user);
     },
     onError: (error) => {
@@ -70,9 +64,6 @@ export default function Login({ onLoginSuccess, onContinueAsGuest }: LoginProps)
         description: error.message,
         variant: "destructive"
       });
-      // Reset CAPTCHA after failed submission
-      recaptchaRef.current?.reset();
-      setCaptchaToken(null);
     }
   });
 
@@ -88,32 +79,19 @@ export default function Login({ onLoginSuccess, onContinueAsGuest }: LoginProps)
       return;
     }
 
-    if (!captchaToken) {
-      toast({
-        title: "Chyba",
-        description: "Prosím dokončete CAPTCHA ověření.",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    authMutation.mutate({ username: username.trim(), password, mode, captchaToken });
-  };
-
-  const handleCaptchaChange = (token: string | null) => {
-    setCaptchaToken(token);
+    authMutation.mutate({ username: username.trim(), password, mode });
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-900 flex items-center justify-center p-4">
       <div className="w-full max-w-md">
         {/* Header */}
         <div className="text-center mb-8">
-          <h1 className="text-3xl font-semibold text-slate-800 mb-2">
+          <h1 className="text-3xl font-semibold text-slate-800 dark:text-slate-100 mb-2">
             <i className="fas fa-comments text-blue-600 mr-3"></i>
-            Chat Aplikace
+            Uncensored ChatBot
           </h1>
-          <p className="text-slate-600">Přihlaste se nebo pokračujte jako host</p>
+          <p className="text-slate-600 dark:text-slate-300">Přihlaste se nebo pokračujte jako host</p>
         </div>
 
         <Card className="shadow-lg">
@@ -149,17 +127,6 @@ export default function Login({ onLoginSuccess, onContinueAsGuest }: LoginProps)
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="Zadejte heslo"
                   disabled={authMutation.isPending}
-                />
-              </div>
-
-              {/* CAPTCHA */}
-              <div className="flex justify-center">
-                <ReCAPTCHA
-                  ref={recaptchaRef}
-                  sitekey={import.meta.env.VITE_RECAPTCHA_SITE_KEY || "6LeIxAcTAAAAAJcZVRqyHh71UMIEGNQ_MXjiZKhI"}
-                  onChange={handleCaptchaChange}
-                  onExpired={() => setCaptchaToken(null)}
-                  onError={() => setCaptchaToken(null)}
                 />
               </div>
 

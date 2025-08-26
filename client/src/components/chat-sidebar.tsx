@@ -4,6 +4,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
+import { useTheme } from "@/components/theme-provider";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 
 interface Chat {
   id: string;
@@ -29,8 +31,10 @@ export default function ChatSidebar({
 }: ChatSidebarProps) {
   const [editingChatId, setEditingChatId] = useState<string | null>(null);
   const [editTitle, setEditTitle] = useState("");
+  const [showSettings, setShowSettings] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { theme, setTheme } = useTheme();
 
   // Fetch user's chats with credentials
   const { data: chatsData, isLoading, error } = useQuery({
@@ -219,22 +223,74 @@ export default function ChatSidebar({
   }
 
   return (
-    <div className="w-64 bg-white border-r border-slate-200 flex flex-col h-screen" data-testid="chat-sidebar">
+    <div className="w-64 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-700 flex flex-col h-screen" data-testid="chat-sidebar">
       {/* User info and new chat */}
-      <div className="p-4 border-b border-slate-200">
+      <div className="p-4 border-b border-slate-200 dark:border-slate-700">
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center space-x-2">
             <i className="fas fa-user-circle text-blue-600"></i>
-            <span className="font-medium text-slate-700">{currentUser.username}</span>
+            <span className="font-medium text-slate-700 dark:text-slate-200">{currentUser.username}</span>
           </div>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={onLogout}
-            data-testid="button-logout"
-          >
-            <i className="fas fa-sign-out-alt"></i>
-          </Button>
+          <div className="flex items-center space-x-1">
+            <Dialog open={showSettings} onOpenChange={setShowSettings}>
+              <DialogTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  data-testid="button-settings"
+                >
+                  <i className="fas fa-cog"></i>
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="sm:max-w-md">
+                <DialogHeader>
+                  <DialogTitle>Nastavení</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Vzhled</label>
+                    <div className="flex space-x-2">
+                      <Button
+                        variant={theme === "light" ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => setTheme("light")}
+                        className="flex-1"
+                      >
+                        <i className="fas fa-sun mr-2"></i>
+                        Světlý
+                      </Button>
+                      <Button
+                        variant={theme === "dark" ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => setTheme("dark")}
+                        className="flex-1"
+                      >
+                        <i className="fas fa-moon mr-2"></i>
+                        Tmavý
+                      </Button>
+                      <Button
+                        variant={theme === "system" ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => setTheme("system")}
+                        className="flex-1"
+                      >
+                        <i className="fas fa-desktop mr-2"></i>
+                        Auto
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              </DialogContent>
+            </Dialog>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={onLogout}
+              data-testid="button-logout"
+            >
+              <i className="fas fa-sign-out-alt"></i>
+            </Button>
+          </div>
         </div>
         
         <Button
