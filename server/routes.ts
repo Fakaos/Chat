@@ -403,7 +403,7 @@ ${prompt}`;
 
       // Make request to ngrok
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 30000);
+      const timeoutId = setTimeout(() => controller.abort(), 300000);
 
       try {
         const response = await fetch(fullUrl, {
@@ -446,7 +446,7 @@ ${prompt}`;
         const errorMessage = fetchError instanceof Error ? fetchError.message : String(fetchError);
         
         if (fetchError instanceof Error && fetchError.name === 'AbortError') {
-          await storage.addLog('error', 'AI request timeout', { timeout: '30s' });
+          await storage.addLog('error', 'AI request timeout', { timeout: '5m' });
           return res.status(408).json({
             error: 'AI service timeout'
           });
